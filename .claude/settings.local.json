@@ -16,7 +16,9 @@
       "Bash(winget install:*)",
       "Bash(\"C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe\" --version)",
       "Bash(\"C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe\" auth login --web)",
-      "Bash(vercel:*)"
+      "Bash(vercel:*)",
+      "Bash(\"C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe\" repo create calculator-app --public --source=. --remote=origin --push)",
+      "Bash(git push:*)"
     ]
   }
 }
