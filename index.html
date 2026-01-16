@@ -19,7 +19,6 @@
             align-items: center;
             background: #1a1a2e;
             padding: 20px;
-            gap: 20px;
         }
 
         .container {
@@ -36,8 +35,15 @@
             padding: 24px;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
             width: 100%;
-            max-width: 420px;
             border: 1px solid #2d3748;
+        }
+
+        .calculator.basic {
+            max-width: 360px;
+        }
+
+        .calculator.scientific {
+            max-width: 480px;
         }
 
         .header {
@@ -57,7 +63,7 @@
             background: #0f3460;
             color: #94a3b8;
             border: none;
-            padding: 6px 12px;
+            padding: 8px 16px;
             border-radius: 6px;
             cursor: pointer;
             font-size: 0.85rem;
@@ -101,8 +107,11 @@
 
         .buttons {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
             gap: 10px;
+        }
+
+        .buttons.basic {
+            grid-template-columns: repeat(4, 1fr);
         }
 
         .buttons.scientific {
@@ -110,7 +119,7 @@
         }
 
         button {
-            padding: 20px;
+            padding: 20px 10px;
             font-size: 1.1rem;
             border: none;
             border-radius: 8px;
@@ -123,8 +132,8 @@
         }
 
         button:hover {
-            background: #2563a8;
             transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
         }
 
         button:active {
@@ -134,6 +143,11 @@
         .number, .decimal {
             background: #1e4976;
             color: #e2e8f0;
+            font-size: 1.3rem;
+        }
+
+        .number:hover, .decimal:hover {
+            background: #2563a8;
         }
 
         .operator {
@@ -160,8 +174,8 @@
         .equals {
             background: #059669;
             color: white;
-            grid-column: span 2;
             border-color: #047857;
+            font-size: 1.3rem;
         }
 
         .equals:hover {
@@ -181,13 +195,16 @@
         .history-toggle {
             background: #0f3460;
             color: #94a3b8;
-            grid-column: span 2;
             font-size: 0.9rem;
         }
 
         .history-toggle:hover {
             background: #1a4d7a;
             color: #e2e8f0;
+        }
+
+        .span-2 {
+            grid-column: span 2;
         }
 
         .history-panel {
@@ -276,7 +293,7 @@
             }
 
             .calculator {
-                max-width: 100%;
+                max-width: 100% !important;
             }
 
             .history-panel {
@@ -289,8 +306,12 @@
             }
 
             button {
-                padding: 16px;
+                padding: 16px 8px;
                 font-size: 1rem;
+            }
+
+            .number, .decimal, .equals {
+                font-size: 1.1rem;
             }
         }
 
@@ -315,7 +336,7 @@
 </head>
 <body>
     <div class="container">
-        <div class="calculator">
+        <div class="calculator basic" id="calculator">
             <div class="header">
                 <div class="title">Professional Calculator</div>
                 <button class="mode-toggle" onclick="toggleMode()" id="modeToggle">Scientific</button>
@@ -326,8 +347,8 @@
                 <div class="display" id="display">0</div>
             </div>
 
-            <div class="buttons" id="buttonContainer">
-                <!-- Basic Mode Buttons -->
+            <div class="buttons basic" id="buttonContainer">
+                <!-- Buttons will be rendered by JavaScript -->
             </div>
         </div>
 
@@ -354,6 +375,7 @@
         const display = document.getElementById('display');
         const expressionDisplay = document.getElementById('expression');
         const buttonContainer = document.getElementById('buttonContainer');
+        const calculator = document.getElementById('calculator');
 
         function updateDisplay() {
             display.textContent = currentInput;
@@ -410,15 +432,16 @@
                 case '+':
                     result = prev + current;
                     break;
+                case '−':
                 case '-':
                     result = prev - current;
                     break;
-                case '*':
                 case '×':
+                case '*':
                     result = prev * current;
                     break;
-                case '/':
                 case '÷':
+                case '/':
                     result = current !== 0 ? prev / current : 'Error';
                     break;
                 case '^':
@@ -474,10 +497,6 @@
                     result = current * current;
                     calcExpression = `${currentInput}²`;
                     break;
-                case 'inverse':
-                    result = 1 / current;
-                    calcExpression = `1/${currentInput}`;
-                    break;
                 case 'percent':
                     result = current / 100;
                     calcExpression = `${currentInput}%`;
@@ -492,7 +511,7 @@
                     break;
                 case 'negate':
                     result = -current;
-                    calcExpression = `-${currentInput}`;
+                    calcExpression = `−${currentInput}`;
                     break;
                 default:
                     return;
@@ -567,12 +586,12 @@
         function toggleMode() {
             isScientific = !isScientific;
             renderButtons();
+            buttonContainer.className = isScientific ? 'buttons scientific' : 'buttons basic';
+            calculator.className = isScientific ? 'calculator scientific' : 'calculator basic';
             document.getElementById('modeToggle').textContent = isScientific ? 'Basic' : 'Scientific';
         }
 
         function renderButtons() {
-            buttonContainer.className = isScientific ? 'buttons scientific' : 'buttons';
-
             if (isScientific) {
                 buttonContainer.innerHTML = `
                     <button class="function" onclick="scientificFunction('sin')">sin</button>
@@ -584,47 +603,49 @@
                     <button class="function" onclick="scientificFunction('sqrt')">√</button>
                     <button class="function" onclick="scientificFunction('square')">x²</button>
                     <button class="function" onclick="appendOperator('^')">x^y</button>
-                    <button class="function" onclick="scientificFunction('inverse')">1/x</button>
-                    <button class="function" onclick="scientificFunction('percent')">%</button>
-
-                    <button class="clear" onclick="clearDisplay()">C</button>
-                    <button class="function" onclick="scientificFunction('negate')">±</button>
                     <button class="function" onclick="scientificFunction('pi')">π</button>
                     <button class="function" onclick="scientificFunction('e')">e</button>
+
+                    <button class="history-toggle" onclick="toggleHistory()">Hist</button>
+                    <button class="clear" onclick="clearDisplay()">AC</button>
+                    <button class="function" onclick="scientificFunction('percent')">%</button>
+                    <button class="function" onclick="scientificFunction('negate')">±</button>
                     <button class="operator" onclick="appendOperator('÷')">÷</button>
 
                     <button class="number" onclick="appendNumber('7')">7</button>
                     <button class="number" onclick="appendNumber('8')">8</button>
                     <button class="number" onclick="appendNumber('9')">9</button>
+                    <span></span>
                     <button class="operator" onclick="appendOperator('×')">×</button>
-                    <button class="history-toggle" onclick="toggleHistory()" style="grid-row: span 2;">History</button>
 
                     <button class="number" onclick="appendNumber('4')">4</button>
                     <button class="number" onclick="appendNumber('5')">5</button>
                     <button class="number" onclick="appendNumber('6')">6</button>
-                    <button class="operator" onclick="appendOperator('-')">−</button>
+                    <span></span>
+                    <button class="operator" onclick="appendOperator('−')">−</button>
 
                     <button class="number" onclick="appendNumber('1')">1</button>
                     <button class="number" onclick="appendNumber('2')">2</button>
                     <button class="number" onclick="appendNumber('3')">3</button>
+                    <span></span>
                     <button class="operator" onclick="appendOperator('+')">+</button>
-                    <button class="equals" onclick="calculate()" style="grid-row: span 2;">=</button>
 
-                    <button class="number" onclick="appendNumber('0')" style="grid-column: span 2;">0</button>
+                    <button class="number span-2" onclick="appendNumber('0')">0</button>
                     <button class="decimal" onclick="appendNumber('.')">.</button>
-                    <button class="operator" onclick="appendOperator('*')">*</button>
+                    <span></span>
+                    <button class="equals" onclick="calculate()">=</button>
                 `;
             } else {
                 buttonContainer.innerHTML = `
-                    <button class="clear" onclick="clearDisplay()">C</button>
+                    <button class="history-toggle" onclick="toggleHistory()">History</button>
+                    <button class="clear" onclick="clearDisplay()">AC</button>
                     <button class="operator" onclick="appendOperator('÷')">÷</button>
                     <button class="operator" onclick="appendOperator('×')">×</button>
-                    <button class="history-toggle" onclick="toggleHistory()">History</button>
 
                     <button class="number" onclick="appendNumber('7')">7</button>
                     <button class="number" onclick="appendNumber('8')">8</button>
                     <button class="number" onclick="appendNumber('9')">9</button>
-                    <button class="operator" onclick="appendOperator('-')">−</button>
+                    <button class="operator" onclick="appendOperator('−')">−</button>
 
                     <button class="number" onclick="appendNumber('4')">4</button>
                     <button class="number" onclick="appendNumber('5')">5</button>
@@ -636,7 +657,7 @@
                     <button class="number" onclick="appendNumber('3')">3</button>
                     <button class="equals" onclick="calculate()">=</button>
 
-                    <button class="number" onclick="appendNumber('0')" style="grid-column: span 2;">0</button>
+                    <button class="number span-2" onclick="appendNumber('0')">0</button>
                     <button class="decimal" onclick="appendNumber('.')">.</button>
                 `;
             }
@@ -650,6 +671,7 @@
             } else if (e.key === '+' || e.key === '-' || e.key === '*' || e.key === '/') {
                 appendOperator(e.key);
             } else if (e.key === 'Enter' || e.key === '=') {
+                e.preventDefault();
                 calculate();
             } else if (e.key === 'Escape' || e.key === 'c' || e.key === 'C') {
                 clearDisplay();

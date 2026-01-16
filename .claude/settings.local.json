@@ -5,7 +5,18 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(dir:*)",
-      "Bash(git config:*)"
+      "Bash(git config:*)",
+      "Bash(gh:*)",
+      "Bash(node --version:*)",
+      "Bash(npm --version:*)",
+      "Bash(vercel --version:*)",
+      "Bash(npm install:*)",
+      "Bash(vercel --yes:*)",
+      "Bash(vercel login:*)",
+      "Bash(winget install:*)",
+      "Bash(\"C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe\" --version)",
+      "Bash(\"C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe\" auth login --web)",
+      "Bash(vercel:*)"
     ]
   }
 }
