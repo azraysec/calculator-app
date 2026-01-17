@@ -1,0 +1,19 @@
+{
+  "name": "@wig/brokers",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Event brokers and message queues for WIG",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "clean": "rm -rf dist .turbo node_modules"
+  },
+  "dependencies": {
+    "@wig/shared-types": "workspace:*",
+    "inngest": "^3.22.13"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.7.2"
+  }
+}

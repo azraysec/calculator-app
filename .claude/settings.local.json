@@ -1,5 +1,6 @@
 {
   "permissions": {
+	"defaultMode": "bypassPermissions",
     "allow": [
       "Bash(git init:*)",
       "Bash(git add:*)",
@@ -18,7 +19,16 @@
       "Bash(\"C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe\" auth login --web)",
       "Bash(vercel:*)",
       "Bash(\"C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe\" repo create calculator-app --public --source=. --remote=origin --push)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(pip:*)",
+      "Bash(\"C:\\\\Program Files\\\\Python311\\\\python.exe\" --version)",
+      "Bash(py:*)",
+      "Bash(\"C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe\" repo create autogen-multiagent --public --source=. --remote=origin --push)",
+      "Bash(git remote add:*)",
+      "Bash(git branch:*)",
+      "Bash(tree:*)",
+      "Bash(pnpm run build:*)",
+      "Bash(pnpm list:*)"
     ]
   }
 }

@@ -1,0 +1,236 @@
+// WIG (Warm Intro Graph) Database Schema
+// Professional networking system for finding warm introduction paths
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// CORE ENTITIES
+// ============================================================================
+
+/// Person represents an individual in the network.
+/// Supports entity resolution through arrays of names, emails, and phones.
+/// Includes merge tracking and GDPR-compliant soft deletes.
+model Person {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime? // Soft delete for GDPR compliance
+
+  // Identity fields - arrays support entity resolution
+  names          String[] // Multiple name variations (nicknames, formal names)
+  emails         String[] // All email addresses for this person
+  phones         String[] // Phone numbers in various formats
+  socialHandles  Json?    // { linkedin: "...", twitter: "...", github: "..." }
+
+  // Professional information
+  title          String?
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  // Entity resolution & merge tracking
+  mergeExplanation String?   // Why this person was merged with others
+  previousIds      String[]  // IDs of persons merged into this one (for undo)
+
+  // Source-specific metadata
+  // Structure: { linkedin: { profileUrl: "...", connections: 500 }, gmail: { ... } }
+  metadata Json?
+
+  // Relationships
+  outgoingEdges Edge[] @relation("FromPerson")
+  incomingEdges Edge[] @relation("ToPerson")
+
+  // Performance indexes
+  @@index([deletedAt]) // Filter out soft-deleted records
+  @@index([emails]) // Fast lookup by email
+  @@index([phones]) // Fast lookup by phone
+  @@map("persons")
+}
+
+/// Organization represents a company or institution.
+/// Linked to Person records for professional context.
+model Organization {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime? // Soft delete for GDPR compliance
+
+  name   String
+  domain String? // Company domain for email matching
+
+  // Source-specific metadata
+  // Structure: { linkedin: { companyId: "...", size: "..." }, clearbit: { ... } }
+  metadata Json?
+
+  // Relationships
+  people Person[]
+
+  @@index([domain])
+  @@index([deletedAt])
+  @@map("organizations")
+}
+
+/// Interaction represents communication events between people.
+/// Captures emails, meetings, calls, messages, etc.
+model Interaction {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Source information
+  sourceId   String // ID from the source system (e.g., Gmail message ID)
+  sourceName String // Source system name (e.g., "gmail", "outlook", "slack")
+
+  // Interaction details
+  timestamp    DateTime                // When the interaction occurred
+  participants String[]                // Array of email addresses/identifiers
+  channel      InteractionChannel      // Communication channel type
+  direction    InteractionDirection?   // Communication direction if applicable
+
+  // Additional context
+  // Structure: { subject: "...", attendees: [...], duration: 30, ... }
+  metadata Json?
+
+  // Performance indexes
+  @@index([timestamp]) // Chronological queries
+  @@index([participants]) // Find interactions by participant
+  @@index([sourceName, sourceId]) // Prevent duplicates from same source
+  @@map("interactions")
+}
+
+// ============================================================================
+// GRAPH RELATIONSHIPS
+// ============================================================================
+
+/// Edge represents a relationship between two people in the network graph.
+/// Includes relationship strength, sources, and interaction metadata.
+model Edge {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationship endpoints
+  fromPersonId String
+  toPersonId   String
+  fromPerson   Person @relation("FromPerson", fields: [fromPersonId], references: [id], onDelete: Cascade)
+  toPerson     Person @relation("ToPerson", fields: [toPersonId], references: [id], onDelete: Cascade)
+
+  // Relationship metadata
+  relationshipType RelationshipType // Type of relationship
+  strength         Float            @default(0.0) // Computed score 0.0-1.0
+
+  // Explainability: Why this strength score?
+  // Structure: { recency: 0.8, frequency: 0.6, mutuality: 0.9, ... }
+  strengthFactors Json?
+
+  // Provenance
+  sources          String[] // Data sources: ["linkedin", "gmail", "calendar"]
+  channels         String[] // Interaction channels: ["email", "meeting"]
+
+  // Temporal tracking
+  firstSeenAt      DateTime // When relationship first observed
+  lastSeenAt       DateTime // Most recent interaction
+  interactionCount Int      @default(0) // Total number of interactions
+
+  // Performance indexes
+  @@index([fromPersonId]) // Graph traversal from source
+  @@index([toPersonId]) // Graph traversal to target
+  @@index([lastSeenAt]) // Find recent relationships
+  @@index([strength]) // Find strongest connections
+  @@unique([fromPersonId, toPersonId]) // One edge per direction per pair
+  @@map("edges")
+}
+
+// ============================================================================
+// SYSTEM STATE
+// ============================================================================
+
+/// SyncState tracks synchronization status for each data source.
+/// Enables incremental syncing and error recovery.
+model SyncState {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sourceName String     @unique // Data source identifier
+  cursor     String?    // Pagination/sync cursor for incremental updates
+
+  // Status tracking
+  lastSyncAt    DateTime? // Last sync attempt
+  lastSuccessAt DateTime? // Last successful sync
+  lastError     String?   // Error message from last failed sync
+  status        SyncStatus @default(idle)
+
+  // Source-specific metadata
+  // Structure: { totalRecords: 1234, newRecords: 56, errors: [...] }
+  metadata Json?
+
+  @@map("sync_states")
+}
+
+/// AuditLog tracks all significant system actions for compliance and debugging.
+/// Includes correlation IDs for tracing multi-step operations.
+model AuditLog {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  // Operation tracking
+  correlationId String  // Group related operations (e.g., merge cascade)
+  action        String  // Action type: "person.merged", "data.synced", etc.
+
+  // Actor information
+  actorId String? // User/system ID that triggered action (null for system)
+
+  // Entity reference
+  entityType String  // Type of entity affected: "Person", "Edge", etc.
+  entityId   String  // ID of the affected entity
+
+  // Event-specific metadata
+  // Structure: { before: {...}, after: {...}, reason: "...", ... }
+  metadata Json?
+
+  // Performance indexes
+  @@index([createdAt]) // Chronological queries
+  @@index([correlationId]) // Trace related operations
+  @@index([entityType, entityId]) // Find all actions on an entity
+  @@map("audit_logs")
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum InteractionChannel {
+  email
+  message
+  meeting
+  call
+  other
+}
+
+enum InteractionDirection {
+  one_way  // Asymmetric (e.g., broadcast email)
+  two_way  // Symmetric (e.g., conversation)
+}
+
+enum RelationshipType {
+  knows          // General acquaintance
+  connected_to   // Explicitly connected (LinkedIn, etc.)
+  interacted_with // Based on communication history
+  worked_at      // Professional relationship
+  advised        // Mentor/advisor relationship
+  invested_in    // Investor relationship
+}
+
+enum SyncStatus {
+  idle     // Not currently syncing
+  running  // Sync in progress
+  failed   // Last sync failed
+  success  // Last sync succeeded
+}
