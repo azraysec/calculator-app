@@ -1,7 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "cd ../.. && pnpm install",
-  "outputDirectory": ".next",
+  "installCommand": "pnpm install",
   "regions": ["iad1"],
   "git": {
     "deploymentEnabled": {
