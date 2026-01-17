@@ -1,9 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "pnpm turbo build --filter=@wig/web",
-  "devCommand": "pnpm turbo dev --filter=@wig/web",
+  "buildCommand": "pnpm --filter=@wig/web build",
+  "devCommand": "pnpm --filter=@wig/web dev",
   "installCommand": "pnpm install",
-  "framework": "nextjs",
   "outputDirectory": "apps/web/.next",
   "ignoreCommand": "git diff --quiet HEAD^ HEAD ./apps/web ./packages",
   "regions": ["iad1"],
