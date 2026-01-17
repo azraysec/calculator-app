@@ -46,6 +46,14 @@ model Person {
   outgoingEdges Edge[] @relation("FromPerson")
   incomingEdges Edge[] @relation("ToPerson")
 
+  // Intro attempt relationships
+  fromIntros       IntroAttempt[] @relation("FromPersonIntros")
+  targetIntros     IntroAttempt[] @relation("TargetPersonIntros")
+  introducerIntros IntroAttempt[] @relation("IntroducerIntros")
+
+  // Task relationships
+  tasks Task[]
+
   // Performance indexes
   @@index([deletedAt]) // Filter out soft-deleted records
   @@index([emails]) // Fast lookup by email
@@ -203,6 +211,112 @@ model AuditLog {
 }
 
 // ============================================================================
+// INTRO WORKFLOW
+// ============================================================================
+
+/// IntroAttempt tracks warm introduction requests through their lifecycle.
+/// Links requester, target, and introducer with path snapshot and status.
+model IntroAttempt {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // The outreach request participants
+  fromPersonId   String // Person asking to be introduced
+  targetPersonId String // Person we want to meet
+  introducerId   String // Person who can make the intro
+
+  fromPerson   Person @relation("FromPersonIntros", fields: [fromPersonId], references: [id], onDelete: Cascade)
+  targetPerson Person @relation("TargetPersonIntros", fields: [targetPersonId], references: [id], onDelete: Cascade)
+  introducer   Person @relation("IntroducerIntros", fields: [introducerId], references: [id], onDelete: Cascade)
+
+  // Path and context
+  pathSnapshot Json // Snapshot of the path at request time
+
+  // Message details
+  message String
+  channel String
+
+  // Status tracking
+  status IntroStatus @default(draft)
+
+  // Lifecycle timestamps
+  sentAt      DateTime?
+  respondedAt DateTime?
+  completedAt DateTime?
+
+  // Outcome
+  outcome IntroOutcome?
+
+  // Performance indexes
+  @@index([fromPersonId])
+  @@index([targetPersonId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("intro_attempts")
+}
+
+/// Draft represents AI-generated message templates for outreach.
+/// Stores generated content with metadata about generation process.
+model Draft {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  // Context
+  introAttemptId String?
+  targetPersonId String
+  introducerId   String?
+
+  // Channel and content
+  channel String
+  subject String?
+  body    String
+  tone    String?
+
+  // Generation metadata
+  generatedBy String
+  model       String?
+
+  // Status
+  status     DraftStatus @default(generated)
+  selectedAt DateTime?
+
+  // Performance indexes
+  @@index([targetPersonId])
+  @@index([status])
+  @@map("drafts")
+}
+
+/// Task represents follow-ups, reminders, and workflow automation.
+/// Links to people and intro attempts for context.
+model Task {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  // Task details
+  title       String
+  description String?
+  type        TaskType
+  status      TaskStatus   @default(pending)
+  priority    TaskPriority @default(medium)
+
+  // Relationships
+  relatedPersonId String?
+  introAttemptId  String?
+
+  relatedPerson Person? @relation(fields: [relatedPersonId], references: [id], onDelete: SetNull)
+
+  // Timing
+  dueAt       DateTime?
+  completedAt DateTime?
+
+  // Performance indexes
+  @@index([status, dueAt])
+  @@index([relatedPersonId])
+  @@map("tasks")
+}
+
+// ============================================================================
 // ENUMS
 // ============================================================================
 
@@ -233,4 +347,44 @@ enum SyncStatus {
   running  // Sync in progress
   failed   // Last sync failed
   success  // Last sync succeeded
+}
+
+enum IntroStatus {
+  draft      // Just created, not sent
+  sent       // Message delivered
+  responded  // Introducer responded
+  completed  // Intro successfully made
+  declined   // Introducer declined
+}
+
+enum IntroOutcome {
+  meeting_scheduled // Meeting scheduled with target
+  intro_made        // Introduction made successfully
+  declined          // Introducer declined
+  no_response       // No response from introducer
+}
+
+enum DraftStatus {
+  generated // AI generated, not reviewed
+  selected  // User selected this draft
+  sent      // Draft was sent
+  discarded // User rejected this draft
+}
+
+enum TaskType {
+  follow_up // Follow up on intro attempt
+  reminder  // Reminder to do something
+  outreach  // Outreach to person
+}
+
+enum TaskStatus {
+  pending   // Not yet started
+  completed // Task completed
+  cancelled // Task cancelled
+}
+
+enum TaskPriority {
+  low
+  medium
+  high
 }
