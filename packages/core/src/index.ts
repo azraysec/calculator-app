@@ -1,4 +1,5 @@
-// Core business logic for the WIG project
-// Placeholder - to be implemented
-
-export const placeholder = "core";
+// Core business logic exports
+export * from './scoring';
+export * from './pathfinding';
+export * from './entity-resolution';
+export * from './graph-service';

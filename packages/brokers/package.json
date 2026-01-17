@@ -1,19 +1,29 @@
 {
   "name": "@wig/brokers",
   "version": "0.1.0",
-  "private": true,
-  "description": "Event brokers and message queues for WIG",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
-  "scripts": {
-    "clean": "rm -rf dist .turbo node_modules"
+  "description": "Action brokers for outbound messaging and task creation",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
   },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest",
+    "test:watch": "vitest --watch"
+  },
+  "keywords": ["brokers", "messaging", "actions"],
   "dependencies": {
-    "@wig/shared-types": "workspace:*",
-    "inngest": "^3.22.13"
+    "@wig/shared-types": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^20.10.0",
-    "typescript": "^5.7.2"
+    "typescript": "^5.9.3",
+    "vitest": "^2.0.0"
   }
 }

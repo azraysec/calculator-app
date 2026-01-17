@@ -24,6 +24,7 @@ export interface SyncParams {
 export interface PaginatedResult<T> {
   items: T[];
   nextCursor?: Cursor;
+  hasMore: boolean;
 }
 
 export interface SourceAdapter {
@@ -32,4 +33,19 @@ export interface SourceAdapter {
   listContacts(params: SyncParams): Promise<PaginatedResult<CanonicalContact>>;
   listOrganizations?(params: SyncParams): Promise<PaginatedResult<CanonicalOrganization>>;
   listInteractions(params: SyncParams): Promise<PaginatedResult<CanonicalInteraction>>;
+  validateConnection(): Promise<{ valid: boolean; error?: string }>;
 }
+
+export interface AdapterConfig {
+  sourceName: string;
+  credentials: Record<string, unknown>;
+  options?: Record<string, unknown>;
+}
+
+export interface AdapterFactory {
+  create(config: AdapterConfig): Promise<SourceAdapter>;
+  supports(sourceName: string): boolean;
+}
+
+// Export ListParams as alias for SyncParams for compatibility
+export type ListParams = SyncParams;

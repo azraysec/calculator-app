@@ -1,21 +1,13 @@
 /**
- * Inngest API Route
- *
- * This endpoint serves the Inngest functions to the Inngest platform.
- * It handles:
- * - Function registration
- * - Event delivery
- * - Webhook signatures verification
- *
- * Environment variables required:
- * - INNGEST_EVENT_KEY: For publishing events
- * - INNGEST_SIGNING_KEY: For webhook verification (production)
+ * Inngest API endpoint for serving functions
+ * This route handles all Inngest communication
  */
 
 import { serve } from 'inngest/next';
-import { inngest, functions } from '@wig/brokers';
+import { inngest } from '@/lib/event-bus';
+import { inngestFunctions } from '@/lib/inngest-functions';
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
-  functions,
+  functions: inngestFunctions,
 });

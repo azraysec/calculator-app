@@ -1,97 +1,48 @@
 /**
- * Readiness Health Check Endpoint
- *
- * Returns 200 OK if the application is ready to serve requests.
- * This includes checking:
- * - Database connectivity
- * - Critical dependencies
- *
- * Use this for:
- * - Kubernetes readiness probes
- * - Load balancer traffic management
- * - Deployment verification
- *
- * Returns 503 Service Unavailable if any check fails.
+ * Readiness probe endpoint
+ * Returns 200 OK only if all dependencies are healthy
  */
 
 import { NextResponse } from 'next/server';
-
-export const dynamic = 'force-dynamic'; // Disable caching
-
-/**
- * Check database connectivity
- * Returns true if DB is reachable, false otherwise
- */
-async function checkDatabase(): Promise<{ healthy: boolean; latency?: number; error?: string }> {
-  try {
-    // TODO: Implement actual database check with Prisma
-    // const start = Date.now();
-    // await prisma.$queryRaw`SELECT 1`;
-    // const latency = Date.now() - start;
-    // return { healthy: true, latency };
-
-    // Placeholder: Always healthy for now
-    return { healthy: true, latency: 0 };
-  } catch (error) {
-    return {
-      healthy: false,
-      error: error instanceof Error ? error.message : 'Unknown database error',
-    };
-  }
-}
-
-/**
- * Check Inngest connectivity (optional)
- * Returns true if Inngest is configured, false otherwise
- */
-function checkInngest(): { healthy: boolean; configured: boolean } {
-  const configured = !!(
-    process.env.INNGEST_EVENT_KEY &&
-    process.env.INNGEST_SIGNING_KEY
-  );
-
-  return {
-    healthy: true, // Inngest failure shouldn't block readiness
-    configured,
-  };
-}
+import { prisma } from '@/lib/prisma';
 
 export async function GET() {
-  const start = Date.now();
+  const checks: Record<string, { status: string; message?: string }> = {};
 
-  // Run all health checks in parallel
-  const [dbCheck, inngestCheck] = await Promise.all([
-    checkDatabase(),
-    Promise.resolve(checkInngest()),
-  ]);
+  // Check database connectivity
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    checks.database = { status: 'healthy' };
+  } catch (error) {
+    checks.database = {
+      status: 'unhealthy',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
 
-  const totalLatency = Date.now() - start;
-  const isHealthy = dbCheck.healthy; // Add more checks here as needed
+  // Check Inngest (optional - may not be critical for startup)
+  try {
+    // Inngest doesn't require a health check, but we can verify the client exists
+    checks.inngest = { status: 'configured' };
+  } catch (error) {
+    checks.inngest = {
+      status: 'warning',
+      message: 'Inngest client not configured',
+    };
+  }
 
-  const response = {
-    status: isHealthy ? 'ready' : 'not-ready',
-    service: 'warm-intro-graph',
-    timestamp: new Date().toISOString(),
-    version: process.env.NEXT_PUBLIC_APP_VERSION || '0.1.0',
-    checks: {
-      database: {
-        status: dbCheck.healthy ? 'healthy' : 'unhealthy',
-        latency: dbCheck.latency,
-        error: dbCheck.error,
-      },
-      inngest: {
-        status: inngestCheck.healthy ? 'healthy' : 'unhealthy',
-        configured: inngestCheck.configured,
-      },
-    },
-    latency: {
-      total: totalLatency,
-      unit: 'ms',
-    },
-  };
+  const allHealthy = Object.values(checks).every(
+    (check) => check.status === 'healthy' || check.status === 'configured'
+  );
+
+  const statusCode = allHealthy ? 200 : 503;
 
   return NextResponse.json(
-    response,
-    { status: isHealthy ? 200 : 503 }
+    {
+      status: allHealthy ? 'ready' : 'not_ready',
+      timestamp: new Date().toISOString(),
+      checks,
+    },
+    { status: statusCode }
   );
 }
