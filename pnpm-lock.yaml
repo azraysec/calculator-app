@@ -195,6 +195,9 @@ importers:
 
   packages/core:
     dependencies:
+      '@prisma/client':
+        specifier: ^5.22.0
+        version: 5.22.0(prisma@5.22.0)
       '@wig/shared-types':
         specifier: workspace:*
         version: link:../shared-types
@@ -202,6 +205,9 @@ importers:
       typescript:
         specifier: ^5.7.2
         version: 5.9.3
+      vitest:
+        specifier: ^2.1.9
+        version: 2.1.9(@types/node@22.19.7)
 
   packages/db:
     dependencies:

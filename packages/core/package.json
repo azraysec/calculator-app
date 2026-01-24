@@ -5,12 +5,17 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
-    "clean": "rm -rf dist .turbo node_modules"
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist .turbo node_modules",
+    "test": "vitest"
   },
   "dependencies": {
+    "@prisma/client": "^5.22.0",
     "@wig/shared-types": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.9"
   }
 }

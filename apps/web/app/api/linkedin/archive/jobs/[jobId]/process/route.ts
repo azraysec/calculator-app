@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { LinkedInArchiveParser } from '@wig/adapters';
+import { LinkedInRelationshipScorer } from '@wig/core';
 
 export async function POST(
   _request: NextRequest,
@@ -120,6 +121,10 @@ async function processArchiveAsync(jobId: string) {
     // Parse the archive
     const result = await parser.parseArchive(filePath);
 
+    // Re-score relationships using LinkedIn evidence
+    const scorer = new LinkedInRelationshipScorer(prisma);
+    const rescored = await scorer.rescorePersonEdges(job.userId);
+
     // Complete job with results
     await prisma.ingestJob.update({
       where: { id: jobId },
@@ -132,6 +137,7 @@ async function processArchiveAsync(jobId: string) {
           messagesProcessed: result.messagesProcessed,
           evidenceEventsCreated: result.evidenceEventsCreated,
           newPersonsAdded: result.newPersonsAdded,
+          edgesRescored: rescored,
           errors: result.errors,
         },
         logs: result.errors.length > 0
