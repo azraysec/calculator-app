@@ -8,12 +8,13 @@ import path from 'path';
 
 test.describe('Data Sources Page', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/data-sources');
+    await page.goto('/');
+    // Click on Data Sources tab
+    await page.getByRole('tab', { name: 'Data Sources' }).click();
   });
 
   test('should display data sources page', async ({ page }) => {
-    await expect(page.locator('h1')).toContainText('Data Sources');
-    await expect(page.getByText(/Connect your professional data sources/)).toBeVisible();
+    await expect(page.getByText('Sync Health')).toBeVisible();
   });
 
   test('should show all data source cards', async ({ page }) => {
@@ -41,7 +42,8 @@ test.describe('Data Sources Page', () => {
 
 test.describe('LinkedIn Archive Upload', () => {
   test('should open upload dialog when clicking LinkedIn upload button', async ({ page }) => {
-    await page.goto('/data-sources');
+    await page.goto('/');
+    await page.getByRole('tab', { name: 'Data Sources' }).click();
 
     // Find and click the LinkedIn upload button
     const linkedInCard = page.locator('text=LinkedIn').locator('..');
@@ -53,7 +55,8 @@ test.describe('LinkedIn Archive Upload', () => {
   });
 
   test('should show upload instructions in dialog', async ({ page }) => {
-    await page.goto('/data-sources');
+    await page.goto('/');
+    await page.getByRole('tab', { name: 'Data Sources' }).click();
     const linkedInCard = page.locator('text=LinkedIn').locator('..');
     await linkedInCard.getByRole('button', { name: /Upload Archive/i }).click();
 
@@ -64,7 +67,8 @@ test.describe('LinkedIn Archive Upload', () => {
   });
 
   test('should allow file selection', async ({ page }) => {
-    await page.goto('/data-sources');
+    await page.goto('/');
+    await page.getByRole('tab', { name: 'Data Sources' }).click();
     const linkedInCard = page.locator('text=LinkedIn').locator('..');
     await linkedInCard.getByRole('button', { name: /Upload Archive/i }).click();
 
@@ -74,7 +78,8 @@ test.describe('LinkedIn Archive Upload', () => {
   });
 
   test('should validate file type', async ({ page }) => {
-    await page.goto('/data-sources');
+    await page.goto('/');
+    await page.getByRole('tab', { name: 'Data Sources' }).click();
     const linkedInCard = page.locator('text=LinkedIn').locator('..');
     await linkedInCard.getByRole('button', { name: /Upload Archive/i }).click();
 
@@ -85,7 +90,8 @@ test.describe('LinkedIn Archive Upload', () => {
   });
 
   test('should close dialog on cancel', async ({ page }) => {
-    await page.goto('/data-sources');
+    await page.goto('/');
+    await page.getByRole('tab', { name: 'Data Sources' }).click();
     const linkedInCard = page.locator('text=LinkedIn').locator('..');
     await linkedInCard.getByRole('button', { name: /Upload Archive/i }).click();
 
@@ -101,20 +107,14 @@ test.describe('LinkedIn Archive Upload', () => {
 });
 
 test.describe('Navigation', () => {
-  test('should navigate from main page to data sources', async ({ page }) => {
+  test('should navigate from main page to data sources tab', async ({ page }) => {
     await page.goto('/');
 
     // Click on Data Sources tab
     await page.getByRole('tab', { name: 'Data Sources' }).click();
 
-    // Should show link to data sources page
-    await expect(page.getByText(/Data Sources management is available/)).toBeVisible();
-
-    // Click the link
-    await page.getByRole('link', { name: /Go to Data Sources/i }).click();
-
-    // Should navigate to data sources page
-    await expect(page).toHaveURL('/data-sources');
-    await expect(page.locator('h1')).toContainText('Data Sources');
+    // Should show Data Sources content
+    await expect(page.getByText('Sync Health')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'LinkedIn' })).toBeVisible();
   });
 });
