@@ -26,6 +26,15 @@ interface Person {
   };
 }
 
+interface SearchResponse {
+  results: Person[];
+  metadata: {
+    usedFuzzyMatch: boolean;
+    query: string;
+    count: number;
+  };
+}
+
 interface PersonSearchProps {
   onSelect: (person: Person) => void;
   placeholder?: string;
@@ -52,16 +61,19 @@ export function PersonSearch({ onSelect, placeholder }: PersonSearchProps) {
     }
   }, [query]);
 
-  const { data: results, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<SearchResponse>({
     queryKey: ['people', searchQuery],
     queryFn: async () => {
-      if (!searchQuery) return [];
+      if (!searchQuery) return { results: [], metadata: { usedFuzzyMatch: false, query: '', count: 0 } };
       const res = await fetch(`/api/people?q=${encodeURIComponent(searchQuery)}`);
       if (!res.ok) throw new Error('Search failed');
-      return res.json() as Promise<Person[]>;
+      return res.json();
     },
     enabled: searchQuery.length > 0,
   });
+
+  const results = data?.results || [];
+  const usedFuzzyMatch = data?.metadata?.usedFuzzyMatch || false;
 
   return (
     <div>
@@ -75,6 +87,11 @@ export function PersonSearch({ onSelect, placeholder }: PersonSearchProps) {
           {isLinkedIn && (
             <div className="p-2 text-xs bg-blue-50 text-blue-700 border-b">
               Detected LinkedIn URL - Searching for: {searchQuery}
+            </div>
+          )}
+          {usedFuzzyMatch && results.length > 0 && (
+            <div className="p-2 text-xs bg-yellow-50 text-yellow-700 border-b">
+              No exact matches found. Did you mean one of these?
             </div>
           )}
           {isLoading && (
