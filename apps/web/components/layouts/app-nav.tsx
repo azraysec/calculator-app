@@ -12,7 +12,6 @@ import {
   Search,
   Users,
   Building2,
-  Database,
   CheckSquare,
   GitMerge,
   Zap,
@@ -24,11 +23,6 @@ const navItems = [
     href: '/',
     label: 'Intro Finder',
     icon: Search,
-  },
-  {
-    href: '/data-sources',
-    label: 'Data Sources',
-    icon: Database,
   },
   {
     href: '/people',

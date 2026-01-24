@@ -16,6 +16,10 @@ import { RequirementsTable } from '@/components/backlog/requirements-table';
 import { NetworkOverview } from '@/components/network/network-overview';
 import { VersionDisplay } from '@/components/common/version-display';
 import { EvidenceViewer } from '@/components/evidence/evidence-viewer';
+import { SourceCard } from '@/components/data-sources/source-card';
+import { SyncHealthWidget } from '@/components/data-sources/sync-health-widget';
+import { LinkedInUploadDialog } from '@/components/data-sources/linkedin-upload-dialog';
+import { Card } from '@/components/ui/card';
 
 interface Person {
   id: string;
@@ -49,9 +53,76 @@ interface PathfindingResult {
   };
 }
 
+interface DataSource {
+  id: string;
+  name: string;
+  displayName: string;
+  type: 'oauth' | 'archive' | 'api';
+  status: 'not_connected' | 'connected' | 'syncing' | 'error';
+  lastSync?: Date;
+  recordCount?: {
+    connections?: number;
+    messages?: number;
+    interactions?: number;
+  };
+  error?: string;
+  icon: React.ReactNode;
+  description: string;
+}
+
+const DATA_SOURCES: DataSource[] = [
+  {
+    id: 'linkedin',
+    name: 'linkedin',
+    displayName: 'LinkedIn',
+    type: 'archive',
+    status: 'not_connected',
+    icon: '🔗',
+    description: 'Import connections and messages from LinkedIn data archive',
+  },
+  {
+    id: 'gmail',
+    name: 'gmail',
+    displayName: 'Gmail',
+    type: 'oauth',
+    status: 'not_connected',
+    icon: '📧',
+    description: 'Connect Gmail to import email interactions',
+  },
+  {
+    id: 'hubspot',
+    name: 'hubspot',
+    displayName: 'HubSpot',
+    type: 'oauth',
+    status: 'not_connected',
+    icon: '🎯',
+    description: 'Sync contacts and interactions from HubSpot CRM',
+  },
+  {
+    id: 'calendar',
+    name: 'calendar',
+    displayName: 'Google Calendar',
+    type: 'oauth',
+    status: 'not_connected',
+    icon: '📅',
+    description: 'Import meeting history and attendees',
+  },
+  {
+    id: 'csv',
+    name: 'csv',
+    displayName: 'CSV Import',
+    type: 'archive',
+    status: 'not_connected',
+    icon: '📄',
+    description: 'Upload contacts from CSV file',
+  },
+];
+
 export default function IntroFinderPage() {
   const [targetPerson, setTargetPerson] = useState<Person | null>(null);
   const [selectedPath, setSelectedPath] = useState<Path | null>(null);
+  const [sources, setSources] = useState<DataSource[]>(DATA_SOURCES);
+  const [linkedInDialogOpen, setLinkedInDialogOpen] = useState(false);
 
   // TODO: Replace with actual user ID from auth
   const currentUserId = 'me';
@@ -80,6 +151,46 @@ export default function IntroFinderPage() {
       setSelectedPath(pathsResult.paths[0]);
     }
   }, [pathsResult, selectedPath]);
+
+  // Data sources handlers
+  const handleConnect = (sourceId: string) => {
+    const source = sources.find((s) => s.id === sourceId);
+    if (!source) return;
+
+    if (source.type === 'archive') {
+      if (sourceId === 'linkedin') {
+        setLinkedInDialogOpen(true);
+      }
+    } else {
+      // OAuth flow would be triggered here
+      console.log('Triggering OAuth for', sourceId);
+    }
+  };
+
+  const handleSync = (sourceId: string) => {
+    setSources((prev) =>
+      prev.map((s) =>
+        s.id === sourceId ? { ...s, status: 'syncing' as const } : s
+      )
+    );
+    // Trigger sync API call
+    console.log('Syncing', sourceId);
+  };
+
+  const handleUploadComplete = (_jobId: string) => {
+    // Update LinkedIn source status
+    setSources((prev) =>
+      prev.map((s) =>
+        s.id === 'linkedin'
+          ? { ...s, status: 'syncing' as const, lastSync: new Date() }
+          : s
+      )
+    );
+    setLinkedInDialogOpen(false);
+  };
+
+  const connectedSources = sources.filter((s) => s.status !== 'not_connected');
+  const errorSources = sources.filter((s) => s.status === 'error');
 
   const introFinderContent = (
     <ThreePanelLayout
@@ -246,16 +357,49 @@ export default function IntroFinderPage() {
         </TabsContent>
 
         <TabsContent value="sources" className="mt-0">
-          <div className="text-center p-8">
-            <p className="text-muted-foreground mb-4">
-              Data Sources management is available on a dedicated page
-            </p>
-            <a
-              href="/data-sources"
-              className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-            >
-              Go to Data Sources
-            </a>
+          <div className="space-y-6">
+            {/* Sync Health Summary */}
+            <SyncHealthWidget
+              connectedCount={connectedSources.length}
+              errorCount={errorSources.length}
+              lastSyncTime={connectedSources[0]?.lastSync || new Date()}
+            />
+
+            {/* Source Cards Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {sources.map((source) => (
+                <SourceCard
+                  key={source.id}
+                  source={source}
+                  onConnect={() => handleConnect(source.id)}
+                  onSync={() => handleSync(source.id)}
+                />
+              ))}
+            </div>
+
+            {/* Recent Sync Runs */}
+            <Card className="p-6">
+              <h2 className="text-xl font-semibold mb-4">Recent Sync Runs</h2>
+              <div className="space-y-3">
+                {connectedSources.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No data sources connected yet. Connect a source above to start building
+                    your network graph.
+                  </p>
+                ) : (
+                  <div className="text-sm text-muted-foreground">
+                    Sync history will appear here after connecting data sources.
+                  </div>
+                )}
+              </div>
+            </Card>
+
+            {/* LinkedIn Upload Dialog */}
+            <LinkedInUploadDialog
+              open={linkedInDialogOpen}
+              onOpenChange={setLinkedInDialogOpen}
+              onUploadComplete={handleUploadComplete}
+            />
           </div>
         </TabsContent>
 

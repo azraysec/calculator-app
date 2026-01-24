@@ -16,10 +16,14 @@ const UPLOAD_DIR = join(process.cwd(), 'uploads', 'linkedin');
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('[LinkedIn Upload] Starting upload process');
+
     // Parse multipart form data
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const userId = formData.get('userId') as string;
+
+    console.log('[LinkedIn Upload] Received file:', file?.name, 'Size:', file?.size);
 
     if (!file) {
       return NextResponse.json(
@@ -67,21 +71,37 @@ export async function POST(request: NextRequest) {
     });
 
     // Ensure upload directory exists
+    console.log('[LinkedIn Upload] Creating upload directory');
     const jobDir = join(UPLOAD_DIR, job.id);
-    await mkdir(jobDir, { recursive: true });
+    try {
+      await mkdir(jobDir, { recursive: true });
+    } catch (mkdirError) {
+      console.error('[LinkedIn Upload] Failed to create directory:', mkdirError);
+      throw new Error(`Failed to create upload directory: ${mkdirError instanceof Error ? mkdirError.message : 'Unknown error'}`);
+    }
 
     // Save file to disk
+    console.log('[LinkedIn Upload] Saving file to:', jobDir);
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
     const filePath = join(jobDir, file.name);
-    await writeFile(filePath, buffer);
+
+    try {
+      await writeFile(filePath, buffer);
+      console.log('[LinkedIn Upload] File saved successfully');
+    } catch (writeError) {
+      console.error('[LinkedIn Upload] Failed to write file:', writeError);
+      throw new Error(`Failed to save file: ${writeError instanceof Error ? writeError.message : 'Unknown error'}`);
+    }
 
     // Update job with file path
     await prisma.ingestJob.update({
       where: { id: job.id },
       data: {
         fileMetadata: {
-          ...job.fileMetadata as object,
+          fileName: file.name,
+          fileSize: file.size,
+          uploadedAt: new Date().toISOString(),
           storagePath: filePath,
         },
       },
