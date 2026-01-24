@@ -17,6 +17,9 @@ export async function GET() {
       orderBy: {
         createdAt: 'desc',
       },
+    }).catch((error) => {
+      console.error('Error fetching people:', error);
+      return [];
     });
 
     // Fetch all edges
@@ -24,6 +27,9 @@ export async function GET() {
       orderBy: {
         strength: 'desc',
       },
+    }).catch((error) => {
+      console.error('Error fetching edges:', error);
+      return [];
     });
 
     // Calculate statistics
@@ -44,7 +50,7 @@ export async function GET() {
       }
       acc[orgName].push(person);
       return acc;
-    }, {} as Record<string, typeof people>);
+    }, {} as Record<string, any[]>);
 
     return NextResponse.json({
       people: people.map(p => ({
