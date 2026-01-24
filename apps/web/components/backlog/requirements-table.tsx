@@ -50,6 +50,30 @@ const REQUIREMENTS: Requirement[] = [
     category: 'Feature',
     notes: 'Display network overview with all people, connections, and statistics',
   },
+  {
+    id: 'REQ-005',
+    requirement: 'Add version number, build, timestamp at top of screen',
+    priority: 'Medium',
+    status: 'Planned',
+    category: 'Feature',
+    notes: 'Display app version, build number, and timestamp for transparency',
+  },
+  {
+    id: 'REQ-006',
+    requirement: 'LinkedIn URL search with connector integration',
+    priority: 'High',
+    status: 'Planned',
+    category: 'Feature',
+    notes: 'If person not in network and LinkedIn URL provided, search via LinkedIn connector',
+  },
+  {
+    id: 'REQ-007',
+    requirement: 'Show nearest name matches for unknown people',
+    priority: 'Medium',
+    status: 'Planned',
+    category: 'Feature',
+    notes: 'When searching for name not in network, show similar/nearest matches',
+  },
 ];
 
 function getPriorityColor(priority: Requirement['priority']) {
