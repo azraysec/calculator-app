@@ -12,6 +12,9 @@ This document tracks feature requests, improvements, and requirements for the Wa
 | REQ-002 | Support LinkedIn URL input | High | Done | Feature | Allow pasting LinkedIn profile URLs to search for people |
 | REQ-003 | Parse LinkedIn profile data | Medium | Done | Feature | Extract name, title, company from LinkedIn URL |
 | REQ-004 | Show all my connections in current graph/DB | High | Done | Feature | Display network overview with all people, connections, and statistics |
+| REQ-005 | Add version/build/timestamp display | Medium | Done | Feature | Show app version, git commit, and build time in header |
+| REQ-006 | LinkedIn connector integration | High | Done | Feature | Fetch LinkedIn profiles via API when not in network. Requires LINKEDIN_ACCESS_TOKEN env var |
+| REQ-007 | Nearest name matches for unknown people | Medium | Done | Feature | Fuzzy string matching to suggest similar names when no exact match found |
 
 ## Status Definitions
 
@@ -53,14 +56,39 @@ This document tracks feature requests, improvements, and requirements for the Wa
 
 ## Recent Changes
 
-### 2026-01-24
-- Added changelog/backlog tracking system
-- Added LinkedIn URL parsing support
+### 2026-01-24 - Phase 2 Complete
+
+#### Core Features
+- Added changelog/backlog tracking system (REQ-001)
+- Added LinkedIn URL parsing support (REQ-002, REQ-003)
 - Created requirements table in UI
-- Added "My Network" tab showing all connections
+- Added "My Network" tab showing all connections (REQ-004)
 - Implemented network overview with statistics
 - Display all people with connection strengths
 - Show organization groupings
+
+#### Enhancement Features
+- Version display with git commit and build time (REQ-005)
+- Fuzzy name matching with Levenshtein distance (REQ-007)
+- "Did you mean..." suggestions for similar names
+- LinkedIn connector integration (REQ-006)
+  - LinkedInAdapter class for API integration
+  - /api/linkedin/profile endpoint
+  - "Search LinkedIn" button in person search
+  - Requires LINKEDIN_ACCESS_TOKEN environment variable
+
+#### Database & Backend
+- Created /api/seed endpoint for remote database seeding
+- Authentication with SEED_SECRET
+- Network API endpoint with statistics
+- Enhanced search API with fuzzy matching fallback
+
+#### UI/UX Improvements
+- Three-tab interface: Intro Finder, My Network, Changelog
+- Color-coded status badges
+- Priority indicators
+- LinkedIn URL detection with visual feedback
+- Fuzzy match indicators
 
 ## How to Add Requirements
 
