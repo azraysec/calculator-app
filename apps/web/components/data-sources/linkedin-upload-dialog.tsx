@@ -16,7 +16,6 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Upload, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 
 interface LinkedInUploadDialogProps {
   open: boolean;
