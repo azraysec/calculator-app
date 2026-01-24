@@ -51,51 +51,41 @@ export async function GET(request: NextRequest) {
 
     const query = validated.q.toLowerCase();
 
-    // First, try exact/partial matching
-    let people = await prisma.person.findMany({
+    // First, get all people and filter for partial name matches
+    // Prisma doesn't support partial matching in array fields, so we fetch and filter
+    const allPeople = await prisma.person.findMany({
       where: {
         deletedAt: null,
-        OR: [
-          {
-            names: {
-              hasSome: [query],
-            },
-          },
-          {
-            emails: {
-              hasSome: [query],
-            },
-          },
-          {
-            title: {
-              contains: query,
-              mode: 'insensitive',
-            },
-          },
-        ],
       },
       include: {
         organization: true,
       },
-      take: 10,
     });
+
+    // Filter for exact or partial matches in names, emails, or title
+    let people = allPeople.filter((person) => {
+      // Check if any name contains the query (case-insensitive partial match)
+      const nameMatch = (person.names as string[]).some((name) =>
+        name.toLowerCase().includes(query)
+      );
+
+      // Check if any email contains the query
+      const emailMatch = (person.emails as string[]).some((email) =>
+        email.toLowerCase().includes(query)
+      );
+
+      // Check if title contains the query
+      const titleMatch = person.title?.toLowerCase().includes(query);
+
+      return nameMatch || emailMatch || titleMatch;
+    }).slice(0, 10);
 
     // Track whether fuzzy matching was used
     let usedFuzzyMatch = false;
 
-    // If no exact matches, try fuzzy matching
+    // If no partial matches, try fuzzy matching
     if (people.length === 0) {
       usedFuzzyMatch = true;
-
-      // Get all people to perform fuzzy matching
-      const allPeople = await prisma.person.findMany({
-        where: {
-          deletedAt: null,
-        },
-        include: {
-          organization: true,
-        },
-      });
 
       // Calculate similarity scores for each person
       const scoredPeople = allPeople.map((person) => {
