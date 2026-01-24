@@ -115,7 +115,7 @@ export function PersonSearch({ onSelect, placeholder }: PersonSearchProps) {
 
   return (
     <div>
-      <Command className="border rounded-md">
+      <Command className="border rounded-md" shouldFilter={false}>
         <CommandInput
           placeholder={placeholder || 'Search by name or paste LinkedIn URL...'}
           value={query}
