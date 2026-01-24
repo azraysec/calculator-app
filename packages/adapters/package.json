@@ -18,11 +18,18 @@
     "test": "vitest",
     "test:watch": "vitest --watch"
   },
-  "keywords": ["adapters", "integrations"],
+  "keywords": [
+    "adapters",
+    "integrations"
+  ],
   "dependencies": {
-    "@wig/shared-types": "workspace:*"
+    "@prisma/client": "^5.22.0",
+    "@wig/shared-types": "workspace:*",
+    "adm-zip": "^0.5.16",
+    "csv-parse": "^6.1.0"
   },
   "devDependencies": {
+    "@types/adm-zip": "^0.5.7",
     "@types/node": "^20.0.0",
     "typescript": "^5.9.3",
     "vitest": "^2.0.0"

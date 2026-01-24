@@ -8,9 +8,10 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { LinkedInArchiveParser } from '@wig/adapters';
 
 export async function POST(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ jobId: string }> }
 ) {
   try {
@@ -78,46 +79,64 @@ export async function POST(
 }
 
 /**
- * Process archive asynchronously
- * This is a placeholder - will be replaced with actual parser in Task #5
+ * Process archive asynchronously using LinkedInArchiveParser
  */
 async function processArchiveAsync(jobId: string) {
   try {
-    // Simulate processing steps
-    const steps = [
-      { name: 'Extracting archive', progress: 20 },
-      { name: 'Parsing Connections.csv', progress: 40 },
-      { name: 'Parsing messages.csv', progress: 60 },
-      { name: 'Creating evidence events', progress: 80 },
-      { name: 'Updating relationship scores', progress: 90 },
-      { name: 'Finalizing', progress: 100 },
-    ];
+    // Get job to retrieve file path
+    const job = await prisma.ingestJob.findUnique({
+      where: { id: jobId },
+    });
 
-    for (const step of steps) {
-      await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulate work
-
-      await prisma.ingestJob.update({
-        where: { id: jobId },
-        data: {
-          progress: step.progress,
-          logs: `${step.name}...`,
-        },
-      });
+    if (!job) {
+      throw new Error('Job not found');
     }
 
-    // Complete job
+    const fileMetadata = job.fileMetadata as any;
+    const filePath = fileMetadata?.storagePath;
+
+    if (!filePath) {
+      throw new Error('File path not found in job metadata');
+    }
+
+    // Create parser with progress callback
+    const parser = new LinkedInArchiveParser(
+      prisma,
+      job.userId,
+      (progress) => {
+        // Update job progress
+        prisma.ingestJob.update({
+          where: { id: jobId },
+          data: {
+            progress: progress.progress,
+            logs: progress.message,
+          },
+        }).catch((err) => {
+          console.error('Failed to update progress:', err);
+        });
+      }
+    );
+
+    // Parse the archive
+    const result = await parser.parseArchive(filePath);
+
+    // Complete job with results
     await prisma.ingestJob.update({
       where: { id: jobId },
       data: {
-        status: 'completed',
+        status: result.errors.length > 0 ? 'completed' : 'completed', // Always complete, but log errors
         completedAt: new Date(),
         progress: 100,
         resultMetadata: {
-          connectionsProcessed: 0, // Placeholder - will be real counts
-          messagesProcessed: 0,
-          evidenceEventsCreated: 0,
-          newPersonsAdded: 0,
+          connectionsProcessed: result.connectionsProcessed,
+          messagesProcessed: result.messagesProcessed,
+          evidenceEventsCreated: result.evidenceEventsCreated,
+          newPersonsAdded: result.newPersonsAdded,
+          errors: result.errors,
         },
+        logs: result.errors.length > 0
+          ? `Completed with ${result.errors.length} errors`
+          : 'Completed successfully',
       },
     });
   } catch (error) {
