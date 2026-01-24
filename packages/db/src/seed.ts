@@ -82,6 +82,25 @@ async function main() {
   // ============================================================================
   console.log('👥 Creating people...');
 
+  // Create the current user ("me")
+  const me = await prisma.person.upsert({
+    where: { id: 'me' },
+    update: {},
+    create: {
+      id: 'me',
+      names: ['You', 'Your Name'],
+      emails: ['you@example.com'],
+      phones: ['+1-555-0100'],
+      socialHandles: {
+        linkedin: 'your-linkedin-profile',
+      },
+      title: 'Your Title',
+      metadata: {
+        isCurrentUser: true,
+      },
+    },
+  });
+
   const alice = await prisma.person.create({
     data: {
       names: ['Alice Johnson', 'Alice M. Johnson', 'A. Johnson'],
@@ -254,6 +273,48 @@ async function main() {
   const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   const sixMonthsAgo = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000);
   const oneYearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+
+  // Me <-> Alice (strong connection, recent interactions)
+  await prisma.edge.create({
+    data: {
+      fromPersonId: me.id,
+      toPersonId: alice.id,
+      relationshipType: RelationshipType.knows,
+      strength: 0.85,
+      strengthFactors: {
+        recency: 0.9,
+        frequency: 0.8,
+        mutuality: 1.0,
+        channels: 0.8,
+      },
+      sources: ['gmail', 'linkedin', 'calendar'],
+      channels: ['email', 'meeting'],
+      firstSeenAt: oneYearAgo,
+      lastSeenAt: oneMonthAgo,
+      interactionCount: 25,
+    },
+  });
+
+  // Me <-> Bob (moderate connection)
+  await prisma.edge.create({
+    data: {
+      fromPersonId: me.id,
+      toPersonId: bob.id,
+      relationshipType: RelationshipType.knows,
+      strength: 0.65,
+      strengthFactors: {
+        recency: 0.65,
+        frequency: 0.6,
+        mutuality: 0.7,
+        channels: 0.4,
+      },
+      sources: ['linkedin'],
+      channels: ['message'],
+      firstSeenAt: sixMonthsAgo,
+      lastSeenAt: sixMonthsAgo,
+      interactionCount: 5,
+    },
+  });
 
   // Alice <-> Bob (strong connection, recent interactions)
   await prisma.edge.create({
