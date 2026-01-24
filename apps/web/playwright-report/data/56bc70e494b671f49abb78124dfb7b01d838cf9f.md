@@ -9,8 +9,8 @@
         - paragraph [ref=e7]: Find warm introduction paths through your professional network
       - generic [ref=e8]:
         - generic [ref=e9]: v0.5.0
-        - generic [ref=e10]: d842ef6
-        - generic [ref=e11]: "Built: 1/24/2026 9:19:22 PM"
+        - generic [ref=e10]: b592983
+        - generic [ref=e11]: "Built: 1/24/2026 9:39:03 PM"
     - generic [ref=e12]:
       - tablist [ref=e13]:
         - tab "Intro Finder" [selected] [ref=e14] [cursor=pointer]
@@ -40,5 +40,5 @@
             - paragraph [ref=e48]: Select a path to view details and generate introduction requests.
   - button "Open Next.js Dev Tools" [ref=e54] [cursor=pointer]:
     - img [ref=e55]
-  - alert [ref=e58]: Warm Intro Graph
+  - alert [ref=e58]
 ```

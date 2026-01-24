@@ -3,8 +3,11 @@
 ## Deployment Information
 - **Version**: 0.5.0
 - **Deployment Date**: 2026-01-24
-- **Git Commit**: 75933d7
-- **Status**: Deployed to Production
+- **Git Commit**: b592983
+- **Status**: Deployed to Vercel Production
+- **URLs:**
+  - Production: https://calculator-n36cx95j3-ray-security.vercel.app
+  - Alias: https://calculator-app-dun-chi.vercel.app
 
 ## Features Implemented
 
