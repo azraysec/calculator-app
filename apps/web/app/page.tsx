@@ -221,6 +221,7 @@ export default function IntroFinderPage() {
         <TabsList className="mb-4">
           <TabsTrigger value="finder">Intro Finder</TabsTrigger>
           <TabsTrigger value="network">My Network</TabsTrigger>
+          <TabsTrigger value="sources">Data Sources</TabsTrigger>
           <TabsTrigger value="changelog">Changelog</TabsTrigger>
         </TabsList>
 
@@ -230,6 +231,20 @@ export default function IntroFinderPage() {
 
         <TabsContent value="network" className="mt-0">
           <NetworkOverview />
+        </TabsContent>
+
+        <TabsContent value="sources" className="mt-0">
+          <div className="text-center p-8">
+            <p className="text-muted-foreground mb-4">
+              Data Sources management is available on a dedicated page
+            </p>
+            <a
+              href="/data-sources"
+              className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              Go to Data Sources
+            </a>
+          </div>
         </TabsContent>
 
         <TabsContent value="changelog" className="mt-0">

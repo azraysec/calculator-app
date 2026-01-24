@@ -2,7 +2,7 @@
 // Professional networking system for finding warm introduction paths
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
@@ -19,16 +19,16 @@ datasource db {
 /// Supports entity resolution through arrays of names, emails, and phones.
 /// Includes merge tracking and GDPR-compliant soft deletes.
 model Person {
-  id        String   @id @default(uuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String    @id @default(uuid())
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime? // Soft delete for GDPR compliance
 
   // Identity fields - arrays support entity resolution
-  names          String[] // Multiple name variations (nicknames, formal names)
-  emails         String[] // All email addresses for this person
-  phones         String[] // Phone numbers in various formats
-  socialHandles  Json?    // { linkedin: "...", twitter: "...", github: "..." }
+  names         String[] // Multiple name variations (nicknames, formal names)
+  emails        String[] // All email addresses for this person
+  phones        String[] // Phone numbers in various formats
+  socialHandles Json? // { linkedin: "...", twitter: "...", github: "..." }
 
   // Professional information
   title          String?
@@ -36,8 +36,8 @@ model Person {
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
   // Entity resolution & merge tracking
-  mergeExplanation String?   // Why this person was merged with others
-  previousIds      String[]  // IDs of persons merged into this one (for undo)
+  mergeExplanation String? // Why this person was merged with others
+  previousIds      String[] // IDs of persons merged into this one (for undo)
 
   // Source-specific metadata
   // Structure: { linkedin: { profileUrl: "...", connections: 500 }, gmail: { ... } }
@@ -65,9 +65,9 @@ model Person {
 /// Organization represents a company or institution.
 /// Linked to Person records for professional context.
 model Organization {
-  id        String   @id @default(uuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String    @id @default(uuid())
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime? // Soft delete for GDPR compliance
 
   name   String
@@ -97,10 +97,10 @@ model Interaction {
   sourceName String // Source system name (e.g., "gmail", "outlook", "slack")
 
   // Interaction details
-  timestamp    DateTime                // When the interaction occurred
-  participants String[]                // Array of email addresses/identifiers
-  channel      InteractionChannel      // Communication channel type
-  direction    InteractionDirection?   // Communication direction if applicable
+  timestamp    DateTime // When the interaction occurred
+  participants String[] // Array of email addresses/identifiers
+  channel      InteractionChannel // Communication channel type
+  direction    InteractionDirection? // Communication direction if applicable
 
   // Additional context
   // Structure: { subject: "...", attendees: [...], duration: 30, ... }
@@ -138,21 +138,25 @@ model Edge {
   // Structure: { recency: 0.8, frequency: 0.6, mutuality: 0.9, ... }
   strengthFactors Json?
 
+  // Top evidence IDs that justify this edge strength (for UI explainability)
+  // References to EvidenceEvent IDs - top 3-5 most important pieces of evidence
+  topEvidenceIds String[] @default([])
+
   // Provenance
-  sources          String[] // Data sources: ["linkedin", "gmail", "calendar"]
-  channels         String[] // Interaction channels: ["email", "meeting"]
+  sources  String[] // Data sources: ["linkedin", "gmail", "calendar"]
+  channels String[] // Interaction channels: ["email", "meeting"]
 
   // Temporal tracking
   firstSeenAt      DateTime // When relationship first observed
   lastSeenAt       DateTime // Most recent interaction
   interactionCount Int      @default(0) // Total number of interactions
 
+  @@unique([fromPersonId, toPersonId]) // One edge per direction per pair
   // Performance indexes
   @@index([fromPersonId]) // Graph traversal from source
   @@index([toPersonId]) // Graph traversal to target
   @@index([lastSeenAt]) // Find recent relationships
   @@index([strength]) // Find strongest connections
-  @@unique([fromPersonId, toPersonId]) // One edge per direction per pair
   @@map("edges")
 }
 
@@ -167,13 +171,13 @@ model SyncState {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  sourceName String     @unique // Data source identifier
-  cursor     String?    // Pagination/sync cursor for incremental updates
+  sourceName String  @unique // Data source identifier
+  cursor     String? // Pagination/sync cursor for incremental updates
 
   // Status tracking
   lastSyncAt    DateTime? // Last sync attempt
   lastSuccessAt DateTime? // Last successful sync
-  lastError     String?   // Error message from last failed sync
+  lastError     String? // Error message from last failed sync
   status        SyncStatus @default(idle)
 
   // Source-specific metadata
@@ -190,15 +194,15 @@ model AuditLog {
   createdAt DateTime @default(now())
 
   // Operation tracking
-  correlationId String  // Group related operations (e.g., merge cascade)
-  action        String  // Action type: "person.merged", "data.synced", etc.
+  correlationId String // Group related operations (e.g., merge cascade)
+  action        String // Action type: "person.merged", "data.synced", etc.
 
   // Actor information
   actorId String? // User/system ID that triggered action (null for system)
 
   // Entity reference
-  entityType String  // Type of entity affected: "Person", "Edge", etc.
-  entityId   String  // ID of the affected entity
+  entityType String // Type of entity affected: "Person", "Edge", etc.
+  entityId   String // ID of the affected entity
 
   // Event-specific metadata
   // Structure: { before: {...}, after: {...}, reason: "...", ... }
@@ -330,56 +334,56 @@ enum InteractionChannel {
 }
 
 enum InteractionDirection {
-  one_way  // Asymmetric (e.g., broadcast email)
-  two_way  // Symmetric (e.g., conversation)
+  one_way // Asymmetric (e.g., broadcast email)
+  two_way // Symmetric (e.g., conversation)
 }
 
 enum RelationshipType {
-  knows          // General acquaintance
-  connected_to   // Explicitly connected (LinkedIn, etc.)
+  knows // General acquaintance
+  connected_to // Explicitly connected (LinkedIn, etc.)
   interacted_with // Based on communication history
-  worked_at      // Professional relationship
-  advised        // Mentor/advisor relationship
-  invested_in    // Investor relationship
+  worked_at // Professional relationship
+  advised // Mentor/advisor relationship
+  invested_in // Investor relationship
 }
 
 enum SyncStatus {
-  idle     // Not currently syncing
-  running  // Sync in progress
-  failed   // Last sync failed
-  success  // Last sync succeeded
+  idle // Not currently syncing
+  running // Sync in progress
+  failed // Last sync failed
+  success // Last sync succeeded
 }
 
 enum IntroStatus {
-  draft      // Just created, not sent
-  sent       // Message delivered
-  responded  // Introducer responded
-  completed  // Intro successfully made
-  declined   // Introducer declined
+  draft // Just created, not sent
+  sent // Message delivered
+  responded // Introducer responded
+  completed // Intro successfully made
+  declined // Introducer declined
 }
 
 enum IntroOutcome {
   meeting_scheduled // Meeting scheduled with target
-  intro_made        // Introduction made successfully
-  declined          // Introducer declined
-  no_response       // No response from introducer
+  intro_made // Introduction made successfully
+  declined // Introducer declined
+  no_response // No response from introducer
 }
 
 enum DraftStatus {
   generated // AI generated, not reviewed
-  selected  // User selected this draft
-  sent      // Draft was sent
+  selected // User selected this draft
+  sent // Draft was sent
   discarded // User rejected this draft
 }
 
 enum TaskType {
   follow_up // Follow up on intro attempt
-  reminder  // Reminder to do something
-  outreach  // Outreach to person
+  reminder // Reminder to do something
+  outreach // Outreach to person
 }
 
 enum TaskStatus {
-  pending   // Not yet started
+  pending // Not yet started
   completed // Task completed
   cancelled // Task cancelled
 }
@@ -388,4 +392,163 @@ enum TaskPriority {
   low
   medium
   high
+}
+
+// ============================================================================
+// EVIDENCE & LINKEDIN INTEGRATION
+// ============================================================================
+
+/// EvidenceEvent captures interaction evidence for relationship scoring and explainability.
+/// Each event represents a piece of proof that strengthens or explains a relationship.
+model EvidenceEvent {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationship this evidence supports
+  subjectPersonId String // Primary person this evidence is about
+  objectPersonId  String? // Optional counterparty (for interactions)
+
+  // Evidence details
+  type      EvidenceType
+  timestamp DateTime // When the evidence occurred
+  source    String // Source system: "linkedin_archive", "linkedin_api", "gmail", etc.
+
+  // Auditability - reference to raw data
+  // Structure: { bucket: "s3-bucket", key: "path/to/file", recordId: "row-123" }
+  rawRef Json?
+
+  // Event-specific metadata
+  // Structure varies by type:
+  //   linkedin_connection: { connectedAt: "...", mutualConnections: 50 }
+  //   linkedin_message_sent: { threadId: "...", messageLength: 250, conversationId: "..." }
+  //   email_thread: { subject: "...", threadLength: 5 }
+  metadata Json?
+
+  // Performance indexes
+  @@index([subjectPersonId, timestamp])
+  @@index([objectPersonId, timestamp])
+  @@index([type, timestamp])
+  @@index([source])
+  @@map("evidence_events")
+}
+
+/// Conversation represents a message thread (LinkedIn DM, email thread, etc.)
+model Conversation {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Source tracking
+  externalId String // ID from source system (LinkedIn thread ID, Gmail thread ID)
+  sourceName String // Source system: "linkedin", "gmail", "slack"
+
+  // Participants (array of person IDs)
+  participants String[]
+
+  // Conversation metadata
+  // Structure: { subject: "...", messageCount: 12, lastActivity: "..." }
+  metadata Json?
+
+  // Relationships
+  messages Message[]
+
+  // Performance indexes
+  @@index([sourceName, externalId])
+  @@index([participants])
+  @@map("conversations")
+}
+
+/// Message represents individual messages within conversations
+model Message {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  // Message location
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  // Message details
+  senderId  String // Person ID of sender
+  timestamp DateTime // When message was sent
+
+  // Content (optionally encrypted)
+  content String? // Message body (can be encrypted at rest)
+
+  // Message metadata
+  // Structure: { length: 250, attachments: [...], hasSchedulingLanguage: true }
+  metadata Json?
+
+  // Performance indexes
+  @@index([conversationId, timestamp])
+  @@index([senderId, timestamp])
+  @@map("messages")
+}
+
+/// IngestJob tracks long-running data import operations
+model IngestJob {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Job details
+  userId     String // User who initiated the job
+  sourceName String // Data source: "linkedin_archive", "gmail", etc.
+  status     IngestJobStatus @default(queued)
+
+  // File tracking
+  // Structure: { fileName: "archive.zip", fileSize: 12345, storageKey: "s3://..." }
+  fileMetadata Json?
+
+  // Progress tracking
+  progress Int @default(0) // Percentage 0-100
+
+  // Timing
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  // Error handling
+  error String? // Error message if failed
+
+  // Results and statistics
+  // Structure: { connectionsProcessed: 500, messagesProcessed: 1200, errorsCount: 3, newPersons: 50 }
+  resultMetadata Json?
+
+  // Job logs (chunked for large outputs)
+  logs String?
+
+  // Performance indexes
+  @@index([userId, createdAt])
+  @@index([status])
+  @@index([sourceName])
+  @@map("ingest_jobs")
+}
+
+// ============================================================================
+// ADDITIONAL ENUMS
+// ============================================================================
+
+enum EvidenceType {
+  linkedin_connection
+  linkedin_message_sent
+  linkedin_message_received
+  linkedin_post_authored
+  linkedin_invitation_sent
+  linkedin_invitation_received
+  linkedin_comment_authored
+  linkedin_reaction
+  email_sent
+  email_received
+  calendar_meeting
+  phone_call
+  human_confirmed_connection
+  manual_note
+}
+
+enum IngestJobStatus {
+  queued
+  running
+  completed
+  failed
+  cancelled
 }
