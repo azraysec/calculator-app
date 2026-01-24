@@ -6,7 +6,6 @@
  */
 
 import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
 
 interface SyncHealthWidgetProps {
@@ -18,7 +17,7 @@ interface SyncHealthWidgetProps {
 export function SyncHealthWidget({
   connectedCount,
   errorCount,
-  lastSyncTime,
+  lastSyncTime: _lastSyncTime,
 }: SyncHealthWidgetProps) {
   const healthStatus =
     errorCount > 0 ? 'error' : connectedCount > 0 ? 'healthy' : 'none';
