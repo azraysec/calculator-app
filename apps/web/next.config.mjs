@@ -40,6 +40,14 @@ const nextConfig = {
     NEXT_PUBLIC_GIT_COMMIT: getGitCommit(),
     NEXT_PUBLIC_BUILD_TIME: new Date().toISOString(),
   },
+  experimental: {
+    outputFileTracingIncludes: {
+      '/api/**/*': [
+        '../../node_modules/.pnpm/@prisma+client@*/node_modules/.prisma/client/**/*',
+        '../../packages/db/node_modules/.prisma/client/**/*',
+      ],
+    },
+  },
 };
 
 export default nextConfig;
