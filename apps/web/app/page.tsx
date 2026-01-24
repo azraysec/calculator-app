@@ -11,6 +11,8 @@ import { PersonSearch } from '@/components/people/person-search';
 import { PathCard } from '@/components/paths/path-card';
 import { GraphCanvas } from '@/components/graph/graph-canvas';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { RequirementsTable } from '@/components/backlog/requirements-table';
 
 interface Person {
   id: string;
@@ -74,7 +76,7 @@ export default function IntroFinderPage() {
     setSelectedPath(pathsResult.paths[0]);
   }
 
-  return (
+  const introFinderContent = (
     <ThreePanelLayout
       leftPanel={
         <div className="space-y-4">
@@ -195,5 +197,31 @@ export default function IntroFinderPage() {
         </div>
       }
     />
+  );
+
+  return (
+    <div className="container mx-auto p-4 max-w-7xl">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold mb-2">Warm Intro Graph</h1>
+        <p className="text-muted-foreground">
+          Find warm introduction paths through your professional network
+        </p>
+      </div>
+
+      <Tabs defaultValue="finder" className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="finder">Intro Finder</TabsTrigger>
+          <TabsTrigger value="changelog">Changelog</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="finder" className="mt-0">
+          {introFinderContent}
+        </TabsContent>
+
+        <TabsContent value="changelog" className="mt-0">
+          <RequirementsTable />
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 }
