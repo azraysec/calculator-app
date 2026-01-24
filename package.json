@@ -10,12 +10,14 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
+    "postinstall": "cd packages/db && prisma generate",
     "lint": "turbo run lint",
     "test": "turbo run test",
     "clean": "turbo run clean",
     "format": "prettier --write \"**/*.{ts,tsx,md}\""
   },
   "devDependencies": {
+    "prisma": "^5.22.0",
     "turbo": "^2.3.3",
     "prettier": "^3.4.2",
     "typescript": "^5.7.2"
