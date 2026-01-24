@@ -10,7 +10,6 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
-    "postinstall": "cd packages/db && prisma generate",
     "lint": "turbo run lint",
     "test": "turbo run test",
     "clean": "turbo run clean",
