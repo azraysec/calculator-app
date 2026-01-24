@@ -30,9 +30,7 @@ const nextConfig = {
     '@wig/brokers',
     '@wig/agent-runtime'
   ],
-  serverActions: {
-    bodySizeLimit: '2mb'
-  },
+  serverExternalPackages: ['@prisma/client', '@prisma/engines'],
   images: {
     remotePatterns: [],
     formats: ['image/avif', 'image/webp']
@@ -41,15 +39,6 @@ const nextConfig = {
     NEXT_PUBLIC_APP_VERSION: getVersion(),
     NEXT_PUBLIC_GIT_COMMIT: getGitCommit(),
     NEXT_PUBLIC_BUILD_TIME: new Date().toISOString(),
-  },
-  experimental: {
-    serverComponentsExternalPackages: ['@prisma/client', '@prisma/engines']
-  },
-  webpack: (config, { isServer }) => {
-    if (isServer) {
-      config.externals.push('@prisma/client', '@prisma/engines')
-    }
-    return config
   },
 };
 
