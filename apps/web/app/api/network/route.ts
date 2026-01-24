@@ -49,15 +49,15 @@ export async function GET() {
     return NextResponse.json({
       people: people.map(p => ({
         id: p.id,
-        names: p.names,
-        emails: p.emails,
-        phones: p.phones,
-        title: p.title,
+        names: Array.isArray(p.names) ? p.names : [],
+        emails: Array.isArray(p.emails) ? p.emails : [],
+        phones: Array.isArray(p.phones) ? p.phones : [],
+        title: p.title || undefined,
         organization: p.organization ? {
           id: p.organization.id,
           name: p.organization.name,
         } : undefined,
-        socialHandles: p.socialHandles as Record<string, string> | undefined,
+        socialHandles: p.socialHandles ? (p.socialHandles as Record<string, string>) : undefined,
       })),
       edges: edges.map(e => ({
         id: e.id,
@@ -65,7 +65,7 @@ export async function GET() {
         toPersonId: e.toPersonId,
         relationshipType: e.relationshipType,
         strength: e.strength,
-        channels: e.channels,
+        channels: Array.isArray(e.channels) ? e.channels : [],
         interactionCount: e.interactionCount,
         lastSeenAt: e.lastSeenAt.toISOString(),
       })),
