@@ -9,8 +9,8 @@ import { z } from 'zod';
 
 const searchSchema = z.object({
   target: z.string().uuid(),
-  maxHops: z.coerce.number().int().min(1).max(5).optional(),
-  minStrength: z.coerce.number().min(0).max(1).optional(),
+  maxHops: z.number().int().min(1).max(5).optional().default(3),
+  minStrength: z.number().min(0).max(1).optional().default(0.3),
 });
 
 export async function GET(
@@ -21,10 +21,14 @@ export async function GET(
     const { id } = await params;
     const { searchParams } = new URL(request.url);
 
+    // Parse query parameters with defaults
+    const maxHops = searchParams.get('maxHops');
+    const minStrength = searchParams.get('minStrength');
+
     const validated = searchSchema.parse({
       target: searchParams.get('target'),
-      maxHops: searchParams.get('maxHops'),
-      minStrength: searchParams.get('minStrength'),
+      maxHops: maxHops ? parseInt(maxHops, 10) : undefined,
+      minStrength: minStrength ? parseFloat(minStrength) : undefined,
     });
 
     const graphService = createGraphService();
