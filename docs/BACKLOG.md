@@ -8,9 +8,10 @@ This document tracks feature requests, improvements, and requirements for the Wa
 
 | ID | Requirement | Priority | Status | Category | Notes |
 |----|-------------|----------|--------|----------|-------|
-| REQ-001 | Add changelog tab to UI | High | In Progress | Feature | Display all requirements with status and priority |
-| REQ-002 | Support LinkedIn URL input | High | In Progress | Feature | Allow pasting LinkedIn profile URLs to search for people |
-| REQ-003 | Parse LinkedIn profile data | Medium | Planned | Feature | Extract name, title, company from LinkedIn URL |
+| REQ-001 | Add changelog tab to UI | High | Done | Feature | Display all requirements with status and priority |
+| REQ-002 | Support LinkedIn URL input | High | Done | Feature | Allow pasting LinkedIn profile URLs to search for people |
+| REQ-003 | Parse LinkedIn profile data | Medium | Done | Feature | Extract name, title, company from LinkedIn URL |
+| REQ-004 | Show all my connections in current graph/DB | High | Done | Feature | Display network overview with all people, connections, and statistics |
 
 ## Status Definitions
 
@@ -56,6 +57,10 @@ This document tracks feature requests, improvements, and requirements for the Wa
 - Added changelog/backlog tracking system
 - Added LinkedIn URL parsing support
 - Created requirements table in UI
+- Added "My Network" tab showing all connections
+- Implemented network overview with statistics
+- Display all people with connection strengths
+- Show organization groupings
 
 ## How to Add Requirements
 

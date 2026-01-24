@@ -30,7 +30,7 @@ const REQUIREMENTS: Requirement[] = [
     id: 'REQ-002',
     requirement: 'Support LinkedIn URL input',
     priority: 'High',
-    status: 'In Progress',
+    status: 'Done',
     category: 'Feature',
     notes: 'Allow pasting LinkedIn profile URLs to search for people',
   },
@@ -38,9 +38,17 @@ const REQUIREMENTS: Requirement[] = [
     id: 'REQ-003',
     requirement: 'Parse LinkedIn profile data',
     priority: 'Medium',
-    status: 'Planned',
+    status: 'Done',
     category: 'Feature',
     notes: 'Extract name, title, company from LinkedIn URL',
+  },
+  {
+    id: 'REQ-004',
+    requirement: 'Show all my connections in current graph/DB',
+    priority: 'High',
+    status: 'Done',
+    category: 'Feature',
+    notes: 'Display network overview with all people, connections, and statistics',
   },
 ];
 

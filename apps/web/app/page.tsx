@@ -13,6 +13,7 @@ import { GraphCanvas } from '@/components/graph/graph-canvas';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RequirementsTable } from '@/components/backlog/requirements-table';
+import { NetworkOverview } from '@/components/network/network-overview';
 
 interface Person {
   id: string;
@@ -211,11 +212,16 @@ export default function IntroFinderPage() {
       <Tabs defaultValue="finder" className="w-full">
         <TabsList className="mb-4">
           <TabsTrigger value="finder">Intro Finder</TabsTrigger>
+          <TabsTrigger value="network">My Network</TabsTrigger>
           <TabsTrigger value="changelog">Changelog</TabsTrigger>
         </TabsList>
 
         <TabsContent value="finder" className="mt-0">
           {introFinderContent}
+        </TabsContent>
+
+        <TabsContent value="network" className="mt-0">
+          <NetworkOverview />
         </TabsContent>
 
         <TabsContent value="changelog" className="mt-0">
