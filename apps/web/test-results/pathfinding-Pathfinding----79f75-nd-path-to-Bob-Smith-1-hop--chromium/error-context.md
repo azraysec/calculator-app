@@ -9,8 +9,8 @@
         - paragraph [ref=e7]: Find warm introduction paths through your professional network
       - generic [ref=e8]:
         - generic [ref=e9]: v0.5.0
-        - generic [ref=e10]: 26cd366
-        - generic [ref=e11]: "Built: 1/24/2026 9:55:38 PM"
+        - generic [ref=e10]: 761c828
+        - generic [ref=e11]: "Built: 1/24/2026 10:05:49 PM"
     - generic [ref=e12]:
       - tablist [ref=e13]:
         - tab "Intro Finder" [selected] [ref=e14] [cursor=pointer]

@@ -2,11 +2,14 @@
 
 /**
  * Requirements Table Component
- * Displays product backlog with status and priority
+ * Displays product backlog with status, priority, dates, sorting, and search
  */
 
+import { useState, useMemo } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 
 interface Requirement {
   id: string;
@@ -15,6 +18,9 @@ interface Requirement {
   status: 'Planned' | 'In Progress' | 'In Review' | 'Done' | 'Blocked' | 'On Hold';
   category: string;
   notes?: string;
+  dateAdded: string;
+  dateStarted?: string;
+  dateCompleted?: string;
 }
 
 const REQUIREMENTS: Requirement[] = [
@@ -25,6 +31,9 @@ const REQUIREMENTS: Requirement[] = [
     status: 'Done',
     category: 'Feature',
     notes: 'Display all requirements with status and priority',
+    dateAdded: '2026-01-20',
+    dateStarted: '2026-01-20',
+    dateCompleted: '2026-01-20',
   },
   {
     id: 'REQ-002',
@@ -33,6 +42,9 @@ const REQUIREMENTS: Requirement[] = [
     status: 'Done',
     category: 'Feature',
     notes: 'Allow pasting LinkedIn profile URLs to search for people',
+    dateAdded: '2026-01-20',
+    dateStarted: '2026-01-20',
+    dateCompleted: '2026-01-21',
   },
   {
     id: 'REQ-003',
@@ -41,6 +53,9 @@ const REQUIREMENTS: Requirement[] = [
     status: 'Done',
     category: 'Feature',
     notes: 'Extract name, title, company from LinkedIn URL',
+    dateAdded: '2026-01-21',
+    dateStarted: '2026-01-21',
+    dateCompleted: '2026-01-21',
   },
   {
     id: 'REQ-004',
@@ -49,6 +64,9 @@ const REQUIREMENTS: Requirement[] = [
     status: 'Done',
     category: 'Feature',
     notes: 'Display network overview with all people, connections, and statistics',
+    dateAdded: '2026-01-21',
+    dateStarted: '2026-01-21',
+    dateCompleted: '2026-01-21',
   },
   {
     id: 'REQ-005',
@@ -57,6 +75,9 @@ const REQUIREMENTS: Requirement[] = [
     status: 'Done',
     category: 'Feature',
     notes: 'Shows app version, git commit hash, and build time in header',
+    dateAdded: '2026-01-21',
+    dateStarted: '2026-01-21',
+    dateCompleted: '2026-01-21',
   },
   {
     id: 'REQ-006',
@@ -65,6 +86,9 @@ const REQUIREMENTS: Requirement[] = [
     status: 'Done',
     category: 'Feature',
     notes: 'Fetches LinkedIn profiles via API when not in network. Requires LINKEDIN_ACCESS_TOKEN env var',
+    dateAdded: '2026-01-22',
+    dateStarted: '2026-01-22',
+    dateCompleted: '2026-01-22',
   },
   {
     id: 'REQ-007',
@@ -73,6 +97,9 @@ const REQUIREMENTS: Requirement[] = [
     status: 'Done',
     category: 'Feature',
     notes: 'Fuzzy string matching with Levenshtein distance. Shows "Did you mean..." suggestions',
+    dateAdded: '2026-01-22',
+    dateStarted: '2026-01-22',
+    dateCompleted: '2026-01-22',
   },
   {
     id: 'REQ-008',
@@ -81,6 +108,9 @@ const REQUIREMENTS: Requirement[] = [
     status: 'Done',
     category: 'Feature',
     notes: 'Upload LinkedIn ZIP archives, parse Connections.csv and messages.csv, create evidence events',
+    dateAdded: '2026-01-23',
+    dateStarted: '2026-01-24',
+    dateCompleted: '2026-01-24',
   },
   {
     id: 'REQ-009',
@@ -89,6 +119,9 @@ const REQUIREMENTS: Requirement[] = [
     status: 'Done',
     category: 'Feature',
     notes: 'Manage data source connections, view sync status, upload archives. Full E2E test coverage.',
+    dateAdded: '2026-01-23',
+    dateStarted: '2026-01-24',
+    dateCompleted: '2026-01-24',
   },
   {
     id: 'REQ-010',
@@ -97,6 +130,9 @@ const REQUIREMENTS: Requirement[] = [
     status: 'Done',
     category: 'Infrastructure',
     notes: 'EvidenceEvent model, Conversation and Message tracking, audit trail for all evidence',
+    dateAdded: '2026-01-24',
+    dateStarted: '2026-01-24',
+    dateCompleted: '2026-01-24',
   },
   {
     id: 'REQ-011',
@@ -105,22 +141,31 @@ const REQUIREMENTS: Requirement[] = [
     status: 'Done',
     category: 'Infrastructure',
     notes: 'Async processing with IngestJob tracking, progress reporting, error handling',
+    dateAdded: '2026-01-24',
+    dateStarted: '2026-01-24',
+    dateCompleted: '2026-01-24',
   },
   {
     id: 'REQ-012',
     requirement: 'LinkedIn relationship strength scoring',
     priority: 'High',
-    status: 'In Progress',
+    status: 'Done',
     category: 'Feature',
     notes: 'Score edges using LinkedIn signals: connection age, message recency, frequency, reciprocity',
+    dateAdded: '2026-01-24',
+    dateStarted: '2026-01-24',
+    dateCompleted: '2026-01-24',
   },
   {
     id: 'REQ-013',
     requirement: 'Evidence viewer in Details panel',
     priority: 'Medium',
-    status: 'Planned',
+    status: 'Done',
     category: 'Feature',
     notes: 'Show evidence cards grouped by path edge with source badges and confidence indicators',
+    dateAdded: '2026-01-24',
+    dateStarted: '2026-01-24',
+    dateCompleted: '2026-01-24',
   },
   {
     id: 'REQ-014',
@@ -129,6 +174,7 @@ const REQUIREMENTS: Requirement[] = [
     status: 'Planned',
     category: 'Feature',
     notes: 'Manual review and approval of suggested person merges with side-by-side comparison',
+    dateAdded: '2026-01-24',
   },
   {
     id: 'REQ-015',
@@ -137,8 +183,57 @@ const REQUIREMENTS: Requirement[] = [
     status: 'Done',
     category: 'Quality',
     notes: '29 E2E tests passing, 10 unit tests for parser. All Phase 3 features tested.',
+    dateAdded: '2026-01-24',
+    dateStarted: '2026-01-24',
+    dateCompleted: '2026-01-24',
+  },
+  {
+    id: 'TASK-016',
+    requirement: 'Fix TypeScript strict mode errors for Vercel deployment',
+    priority: 'Critical',
+    status: 'Done',
+    category: 'Bug Fix',
+    notes: 'Fixed scoring module structure, removed unused imports, fixed unused parameters',
+    dateAdded: '2026-01-24',
+    dateStarted: '2026-01-24',
+    dateCompleted: '2026-01-24',
+  },
+  {
+    id: 'TASK-017',
+    requirement: 'Integrate Data Sources back into main page',
+    priority: 'High',
+    status: 'Done',
+    category: 'Enhancement',
+    notes: 'Moved from separate /data-sources page to tab in main interface. Updated navigation and tests.',
+    dateAdded: '2026-01-24',
+    dateStarted: '2026-01-24',
+    dateCompleted: '2026-01-24',
+  },
+  {
+    id: 'TASK-018',
+    requirement: 'Implement Vercel Blob Storage for file uploads',
+    priority: 'Critical',
+    status: 'Done',
+    category: 'Infrastructure',
+    notes: 'Replaced local filesystem with Vercel Blob Storage. LinkedIn archives now work in serverless environment.',
+    dateAdded: '2026-01-24',
+    dateStarted: '2026-01-24',
+    dateCompleted: '2026-01-24',
+  },
+  {
+    id: 'TASK-019',
+    requirement: 'Enhanced changelog with sorting, search, and dates',
+    priority: 'Medium',
+    status: 'In Progress',
+    category: 'Enhancement',
+    notes: 'Added date tracking, sortable columns, search functionality. Auto-track all development tasks.',
+    dateAdded: '2026-01-24',
+    dateStarted: '2026-01-24',
   },
 ];
+
+type SortField = keyof Requirement;
+type SortDirection = 'asc' | 'desc';
 
 function getPriorityColor(priority: Requirement['priority']) {
   switch (priority) {
@@ -171,29 +266,139 @@ function getStatusColor(status: Requirement['status']) {
 }
 
 export function RequirementsTable() {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortField, setSortField] = useState<SortField>('id');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const filteredAndSortedRequirements = useMemo(() => {
+    // Filter by search query
+    let filtered = REQUIREMENTS.filter((req) => {
+      const query = searchQuery.toLowerCase();
+      return (
+        req.id.toLowerCase().includes(query) ||
+        req.requirement.toLowerCase().includes(query) ||
+        req.category.toLowerCase().includes(query) ||
+        req.notes?.toLowerCase().includes(query) ||
+        req.status.toLowerCase().includes(query) ||
+        req.priority.toLowerCase().includes(query)
+      );
+    });
+
+    // Sort by selected field
+    filtered.sort((a, b) => {
+      const aValue = a[sortField] || '';
+      const bValue = b[sortField] || '';
+
+      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return filtered;
+  }, [searchQuery, sortField, sortDirection]);
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return <ArrowUpDown className="w-3 h-3 inline ml-1 opacity-50" />;
+    return sortDirection === 'asc' ? (
+      <ArrowUp className="w-3 h-3 inline ml-1" />
+    ) : (
+      <ArrowDown className="w-3 h-3 inline ml-1" />
+    );
+  };
+
   return (
     <Card className="p-6">
       <div className="mb-4">
-        <h2 className="text-2xl font-bold mb-2">Product Backlog</h2>
-        <p className="text-sm text-muted-foreground">
-          Feature requests, improvements, and requirements tracked for WIG
+        <h2 className="text-2xl font-bold mb-2">Development Changelog</h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          Feature requests, improvements, bug fixes, and all development tasks tracked for WIG
         </p>
+
+        {/* Search Box */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Search by ID, requirement, category, status, notes..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+
+        {searchQuery && (
+          <div className="mt-2 text-sm text-muted-foreground">
+            Showing {filteredAndSortedRequirements.length} of {REQUIREMENTS.length} items
+          </div>
+        )}
       </div>
 
       <div className="overflow-x-auto">
         <table className="w-full border-collapse">
           <thead>
             <tr className="border-b-2">
-              <th className="text-left p-3 font-semibold">ID</th>
-              <th className="text-left p-3 font-semibold">Requirement</th>
-              <th className="text-left p-3 font-semibold">Priority</th>
-              <th className="text-left p-3 font-semibold">Status</th>
-              <th className="text-left p-3 font-semibold">Category</th>
+              <th
+                className="text-left p-3 font-semibold cursor-pointer hover:bg-muted/50"
+                onClick={() => handleSort('id')}
+              >
+                ID <SortIcon field="id" />
+              </th>
+              <th
+                className="text-left p-3 font-semibold cursor-pointer hover:bg-muted/50"
+                onClick={() => handleSort('requirement')}
+              >
+                Requirement <SortIcon field="requirement" />
+              </th>
+              <th
+                className="text-left p-3 font-semibold cursor-pointer hover:bg-muted/50"
+                onClick={() => handleSort('priority')}
+              >
+                Priority <SortIcon field="priority" />
+              </th>
+              <th
+                className="text-left p-3 font-semibold cursor-pointer hover:bg-muted/50"
+                onClick={() => handleSort('status')}
+              >
+                Status <SortIcon field="status" />
+              </th>
+              <th
+                className="text-left p-3 font-semibold cursor-pointer hover:bg-muted/50"
+                onClick={() => handleSort('category')}
+              >
+                Category <SortIcon field="category" />
+              </th>
+              <th
+                className="text-left p-3 font-semibold cursor-pointer hover:bg-muted/50"
+                onClick={() => handleSort('dateAdded')}
+              >
+                Date Added <SortIcon field="dateAdded" />
+              </th>
+              <th
+                className="text-left p-3 font-semibold cursor-pointer hover:bg-muted/50"
+                onClick={() => handleSort('dateStarted')}
+              >
+                Date Started <SortIcon field="dateStarted" />
+              </th>
+              <th
+                className="text-left p-3 font-semibold cursor-pointer hover:bg-muted/50"
+                onClick={() => handleSort('dateCompleted')}
+              >
+                Date Completed <SortIcon field="dateCompleted" />
+              </th>
               <th className="text-left p-3 font-semibold">Notes</th>
             </tr>
           </thead>
           <tbody>
-            {REQUIREMENTS.map((req) => (
+            {filteredAndSortedRequirements.map((req) => (
               <tr key={req.id} className="border-b hover:bg-muted/50">
                 <td className="p-3 font-mono text-sm">{req.id}</td>
                 <td className="p-3">{req.requirement}</td>
@@ -212,6 +417,9 @@ export function RequirementsTable() {
                     {req.category}
                   </span>
                 </td>
+                <td className="p-3 text-sm">{req.dateAdded}</td>
+                <td className="p-3 text-sm">{req.dateStarted || '-'}</td>
+                <td className="p-3 text-sm">{req.dateCompleted || '-'}</td>
                 <td className="p-3 text-sm text-muted-foreground max-w-md">
                   {req.notes}
                 </td>
