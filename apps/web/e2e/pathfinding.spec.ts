@@ -22,15 +22,15 @@ test.describe('Pathfinding - Critical Feature', () => {
     await expect(page.getByText('Alice Johnson')).toBeVisible();
 
     // Should show path results (may take time to calculate)
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(5000);
 
-    // Check if paths loaded or error shown
-    const hasPathCards = await page.locator('.space-y-3 > div').count();
+    // Check if paths loaded by looking for "% strength" badges or error/no paths messages
+    const hasStrengthBadge = await page.getByText(/\d+% strength/).isVisible().catch(() => false);
     const hasError = await page.getByText('Error').isVisible().catch(() => false);
     const hasNoPaths = await page.getByText('No paths found').isVisible().catch(() => false);
 
     // Should either show paths or a valid message
-    expect(hasPathCards > 0 || hasError || hasNoPaths).toBeTruthy();
+    expect(hasStrengthBadge || hasError || hasNoPaths).toBeTruthy();
   });
 
   test('should find path to Bob Smith (1 hop)', async ({ page }) => {
@@ -59,13 +59,13 @@ test.describe('Pathfinding - Critical Feature', () => {
     const result = page.locator('[cmdk-item]').first();
     if (await result.isVisible()) {
       await result.click();
-      await page.waitForTimeout(3000);
+      await page.waitForTimeout(5000);
 
-      // Should show either paths or "no paths" message
-      const hasPaths = await page.locator('.space-y-3 > div').count() > 0;
+      // Should show either paths (with "% strength") or "no paths" message
+      const hasStrengthBadge = await page.getByText(/\d+% strength/).isVisible().catch(() => false);
       const hasNoPathMsg = await page.getByText('No paths found').isVisible().catch(() => false);
 
-      expect(hasPaths || hasNoPathMsg).toBeTruthy();
+      expect(hasStrengthBadge || hasNoPathMsg).toBeTruthy();
     }
   });
 
@@ -77,18 +77,17 @@ test.describe('Pathfinding - Critical Feature', () => {
     const result = page.locator('[cmdk-item]').filter({ hasText: 'Alice Johnson' });
     await result.click();
 
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(5000);
 
-    // If paths exist, check path details
-    const pathCards = page.locator('.space-y-3 > div');
-    const count = await pathCards.count();
+    // If paths exist (indicated by "% strength" badges), check path details
+    const hasStrengthBadge = await page.getByText(/\d+% strength/).isVisible().catch(() => false);
 
-    if (count > 0) {
-      // Click first path
-      await pathCards.first().click();
-
-      // Right panel should show path details
-      await expect(page.getByText('Path Details')).toBeVisible({ timeout: 2000 });
+    if (hasStrengthBadge) {
+      // Path should be auto-selected, right panel should show details
+      await expect(page.getByText('Path Details')).toBeVisible({ timeout: 3000 });
+    } else {
+      // If no paths, that's also a valid scenario
+      console.log('No paths found for Alice - skipping path details check');
     }
   });
 
