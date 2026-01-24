@@ -2,7 +2,7 @@
  * Graph-related types for pathfinding and scoring
  */
 
-import type { Person, Edge, Path, PathRankingFactors } from './domain';
+import type { Person, Path, PathRankingFactors } from './domain';
 
 export interface PathfindingOptions {
   maxHops?: number; // default 3

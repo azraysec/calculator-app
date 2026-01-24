@@ -170,6 +170,10 @@ importers:
         version: 2.1.9(@types/node@22.19.7)
 
   packages/core:
+    dependencies:
+      '@wig/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
     devDependencies:
       typescript:
         specifier: ^5.7.2

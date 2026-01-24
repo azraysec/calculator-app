@@ -5,8 +5,11 @@
  * This package prevents circular dependencies and ensures consistency.
  */
 
-// Canonical data models
-export * from './canonical';
+// Core domain types
+export * from './domain';
+
+// Graph types
+export * from './graph';
 
 // Adapter interfaces
 export * from './adapters';

@@ -5,9 +5,7 @@
  * Adapters transform source-specific data into canonical formats.
  */
 
-import type { CanonicalContact, CanonicalOrganization, CanonicalInteraction } from './canonical';
-
-export type Cursor = string;
+import type { CanonicalContact, CanonicalOrganization, CanonicalInteraction, Cursor } from './domain';
 
 export interface AdapterCapabilities {
   contacts: boolean;

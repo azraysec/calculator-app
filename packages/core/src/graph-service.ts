@@ -9,6 +9,7 @@ import type {
   PathfindingResult,
   Path,
   PathExplanation,
+  PathRankingFactors,
   GraphStats,
   EntityResolutionMatch,
   ScoringWeights,

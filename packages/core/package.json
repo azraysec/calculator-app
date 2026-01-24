@@ -7,6 +7,9 @@
   "scripts": {
     "clean": "rm -rf dist .turbo node_modules"
   },
+  "dependencies": {
+    "@wig/shared-types": "workspace:*"
+  },
   "devDependencies": {
     "typescript": "^5.7.2"
   }

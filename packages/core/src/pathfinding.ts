@@ -117,8 +117,8 @@ export class PathFinder {
 
     for (let i = 1; i < nodes.length; i++) {
       if (nodes[i].fromEdge) {
-        edges.push(nodes[i].fromEdge);
-        score *= nodes[i].fromEdge.strength;
+        edges.push(nodes[i].fromEdge!);
+        score *= nodes[i].fromEdge!.strength;
       }
     }
 
@@ -160,9 +160,9 @@ export class PathFinder {
    * Check if person/edge should be skipped based on preferences
    */
   private shouldSkipByPreferences(
-    person: Person,
-    edge: Edge,
-    preferences: PathfindingOptions['preferences']
+    _person: Person,
+    _edge: Edge,
+    _preferences: PathfindingOptions['preferences']
   ): boolean {
     // TODO: Implement category avoidance
     // TODO: Implement geography preference
