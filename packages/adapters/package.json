@@ -23,6 +23,7 @@
     "@wig/shared-types": "workspace:*"
   },
   "devDependencies": {
+    "@types/node": "^20.0.0",
     "typescript": "^5.9.3",
     "vitest": "^2.0.0"
   }

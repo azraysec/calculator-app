@@ -41,8 +41,7 @@ export class MockAdapter extends BaseAdapter implements SourceAdapter {
     // Filter by date if provided
     if (since) {
       filtered = filtered.filter((c) => {
-        const updated = c.metadata.updatedAt as Date | undefined;
-        return updated ? updated >= since : true;
+        return c.updatedAt >= since;
       });
     }
 
@@ -90,9 +89,10 @@ export function generateMockData(): MockData {
       title: 'VP Engineering',
       organizationName: 'Acme Corp',
       metadata: {
-        updatedAt: daysAgo(7),
         domain: 'acme.com',
       },
+      createdAt: daysAgo(30),
+      updatedAt: daysAgo(7),
     },
     {
       sourceId: 'mock-2',
@@ -107,9 +107,10 @@ export function generateMockData(): MockData {
       title: 'CTO',
       organizationName: 'Startup Inc',
       metadata: {
-        updatedAt: daysAgo(2),
         domain: 'startup.io',
       },
+      createdAt: daysAgo(20),
+      updatedAt: daysAgo(2),
     },
     {
       sourceId: 'mock-3',
@@ -121,9 +122,10 @@ export function generateMockData(): MockData {
       title: 'Security Architect',
       organizationName: 'TechCorp',
       metadata: {
-        updatedAt: daysAgo(14),
         domain: 'techcorp.com',
       },
+      createdAt: daysAgo(60),
+      updatedAt: daysAgo(14),
     },
   ];
 
@@ -134,11 +136,13 @@ export function generateMockData(): MockData {
       timestamp: daysAgo(7),
       participants: ['me@example.com', 'alice@acme.com'],
       channel: 'email',
-      direction: '2-way',
+      direction: 'bidirectional',
       metadata: {
         subject: 'Re: Partnership Discussion',
         threadId: 'thread-1',
       },
+      createdAt: daysAgo(7),
+      updatedAt: daysAgo(7),
     },
     {
       sourceId: 'int-2',
@@ -150,6 +154,8 @@ export function generateMockData(): MockData {
         title: 'Weekly Sync',
         duration: 30,
       },
+      createdAt: daysAgo(14),
+      updatedAt: daysAgo(14),
     },
     {
       sourceId: 'int-3',
@@ -157,10 +163,12 @@ export function generateMockData(): MockData {
       timestamp: daysAgo(2),
       participants: ['me@example.com', 'bob@startup.io'],
       channel: 'email',
-      direction: '1-way',
+      direction: 'outbound',
       metadata: {
         subject: 'Introduction to Carol',
       },
+      createdAt: daysAgo(2),
+      updatedAt: daysAgo(2),
     },
     {
       sourceId: 'int-4',
@@ -172,6 +180,8 @@ export function generateMockData(): MockData {
         title: 'Conference Call',
         duration: 60,
       },
+      createdAt: daysAgo(30),
+      updatedAt: daysAgo(30),
     },
     {
       sourceId: 'int-5',
@@ -179,10 +189,12 @@ export function generateMockData(): MockData {
       timestamp: daysAgo(45),
       participants: ['bob@startup.io', 'carol@techcorp.com'],
       channel: 'email',
-      direction: '2-way',
+      direction: 'bidirectional',
       metadata: {
         subject: 'Security Review',
       },
+      createdAt: daysAgo(45),
+      updatedAt: daysAgo(45),
     },
   ];
 
