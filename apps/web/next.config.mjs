@@ -22,6 +22,7 @@ const getVersion = () => {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  output: 'standalone',
   transpilePackages: [
     '@wig/shared-types',
     '@wig/core',
@@ -30,7 +31,6 @@ const nextConfig = {
     '@wig/brokers',
     '@wig/agent-runtime'
   ],
-  serverExternalPackages: ['@prisma/client', '@prisma/engines'],
   images: {
     remotePatterns: [],
     formats: ['image/avif', 'image/webp']
