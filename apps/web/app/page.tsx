@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RequirementsTable } from '@/components/backlog/requirements-table';
 import { NetworkOverview } from '@/components/network/network-overview';
 import { VersionDisplay } from '@/components/common/version-display';
+import { EvidenceViewer } from '@/components/evidence/evidence-viewer';
 
 interface Person {
   id: string;
@@ -160,39 +161,50 @@ export default function IntroFinderPage() {
       rightPanel={
         <div className="space-y-4">
           {selectedPath ? (
-            <>
-              <div>
-                <h3 className="font-semibold mb-2">Path Details</h3>
-                <div className="space-y-2">
-                  {selectedPath.nodes.map((person, index) => (
-                    <div key={person.id} className="text-sm">
-                      <div className="font-medium">{person.names[0]}</div>
-                      {person.title && (
-                        <div className="text-muted-foreground text-xs">
-                          {person.title}
-                        </div>
-                      )}
-                      {index < selectedPath.nodes.length - 1 && (
-                        <div className="text-xs text-muted-foreground ml-4 my-1">
-                          ↓ {Math.round(selectedPath.edges[index].strength * 100)}
-                          % connection strength
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
+            <Tabs defaultValue="details" className="w-full">
+              <TabsList className="w-full">
+                <TabsTrigger value="details" className="flex-1">Details</TabsTrigger>
+                <TabsTrigger value="evidence" className="flex-1">Evidence</TabsTrigger>
+              </TabsList>
 
-              <div className="pt-4 border-t">
-                <h3 className="font-semibold mb-2">Next Steps</h3>
-                <p className="text-sm text-muted-foreground mb-3">
-                  {selectedPath.explanation}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Evidence viewer and outreach composer coming in next phase...
-                </p>
-              </div>
-            </>
+              <TabsContent value="details" className="mt-4">
+                <div>
+                  <h3 className="font-semibold mb-2">Path Details</h3>
+                  <div className="space-y-2">
+                    {selectedPath.nodes.map((person, index) => (
+                      <div key={person.id} className="text-sm">
+                        <div className="font-medium">{person.names[0]}</div>
+                        {person.title && (
+                          <div className="text-muted-foreground text-xs">
+                            {person.title}
+                          </div>
+                        )}
+                        {index < selectedPath.nodes.length - 1 && (
+                          <div className="text-xs text-muted-foreground ml-4 my-1">
+                            ↓ {Math.round(selectedPath.edges[index].strength * 100)}
+                            % connection strength
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t">
+                  <h3 className="font-semibold mb-2">Next Steps</h3>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    {selectedPath.explanation}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Outreach composer coming in next phase...
+                  </p>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="evidence" className="mt-4">
+                <EvidenceViewer />
+              </TabsContent>
+            </Tabs>
           ) : (
             <p className="text-sm text-muted-foreground">
               Select a path to view details and generate introduction requests.
