@@ -67,7 +67,7 @@ export async function GET() {
         strength: e.strength,
         channels: e.channels,
         interactionCount: e.interactionCount,
-        lastSeenAt: e.lastSeenAt,
+        lastSeenAt: e.lastSeenAt.toISOString(),
       })),
       stats,
       organizationGroups: Object.entries(organizationGroups).map(([name, members]) => ({
