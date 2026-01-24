@@ -10,6 +10,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { LinkedInArchiveParser } from '@wig/adapters';
 import { LinkedInRelationshipScorer } from '@wig/core';
+import { writeFile, unlink } from 'fs/promises';
+import { join } from 'path';
+import { tmpdir } from 'os';
 
 export async function POST(
   _request: NextRequest,
@@ -83,8 +86,10 @@ export async function POST(
  * Process archive asynchronously using LinkedInArchiveParser
  */
 async function processArchiveAsync(jobId: string) {
+  let tempFilePath: string | null = null;
+
   try {
-    // Get job to retrieve file path
+    // Get job to retrieve blob URL
     const job = await prisma.ingestJob.findUnique({
       where: { id: jobId },
     });
@@ -94,11 +99,26 @@ async function processArchiveAsync(jobId: string) {
     }
 
     const fileMetadata = job.fileMetadata as any;
-    const filePath = fileMetadata?.storagePath;
+    const blobUrl = fileMetadata?.blobUrl;
 
-    if (!filePath) {
-      throw new Error('File path not found in job metadata');
+    if (!blobUrl) {
+      throw new Error('Blob URL not found in job metadata');
     }
+
+    // Download file from Vercel Blob to temp location
+    console.log('[LinkedIn Process] Downloading from blob:', blobUrl);
+    const response = await fetch(blobUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to download file from blob: ${response.statusText}`);
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    // Save to temp file
+    tempFilePath = join(tmpdir(), `linkedin-archive-${jobId}.zip`);
+    await writeFile(tempFilePath, buffer);
+    console.log('[LinkedIn Process] File downloaded to temp:', tempFilePath);
 
     // Create parser with progress callback
     const parser = new LinkedInArchiveParser(
@@ -119,7 +139,7 @@ async function processArchiveAsync(jobId: string) {
     );
 
     // Parse the archive
-    const result = await parser.parseArchive(filePath);
+    const result = await parser.parseArchive(tempFilePath);
 
     // Re-score relationships using LinkedIn evidence
     const scorer = new LinkedInRelationshipScorer(prisma);
@@ -145,7 +165,25 @@ async function processArchiveAsync(jobId: string) {
           : 'Completed successfully',
       },
     });
+
+    // Clean up temp file
+    if (tempFilePath) {
+      try {
+        await unlink(tempFilePath);
+        console.log('[LinkedIn Process] Temp file cleaned up');
+      } catch (unlinkError) {
+        console.error('[LinkedIn Process] Failed to delete temp file:', unlinkError);
+      }
+    }
   } catch (error) {
+    // Clean up temp file on error
+    if (tempFilePath) {
+      try {
+        await unlink(tempFilePath);
+      } catch (unlinkError) {
+        console.error('[LinkedIn Process] Failed to delete temp file on error:', unlinkError);
+      }
+    }
     throw error;
   }
 }

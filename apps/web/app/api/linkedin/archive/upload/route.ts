@@ -3,16 +3,14 @@
  * POST /api/linkedin/archive/upload
  *
  * Accepts multipart/form-data with LinkedIn archive ZIP file
- * Creates IngestJob record and stores file for processing
+ * Creates IngestJob record and stores file to Vercel Blob Storage
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
+import { put } from '@vercel/blob';
 import { prisma } from '@/lib/prisma';
 
 const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
-const UPLOAD_DIR = join(process.cwd(), 'uploads', 'linkedin');
 
 export async function POST(request: NextRequest) {
   try {
@@ -55,63 +53,44 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create IngestJob record
-    const job = await prisma.ingestJob.create({
-      data: {
-        userId,
-        sourceName: 'linkedin_archive',
+    // Upload file to Vercel Blob Storage
+    console.log('[LinkedIn Upload] Uploading to Vercel Blob Storage');
+    const blobPath = `linkedin-archives/${userId}/${Date.now()}-${file.name}`;
+
+    try {
+      const blob = await put(blobPath, file, {
+        access: 'public',
+        addRandomSuffix: false,
+      });
+
+      console.log('[LinkedIn Upload] File uploaded to blob:', blob.url);
+
+      // Create IngestJob record with blob URL
+      const job = await prisma.ingestJob.create({
+        data: {
+          userId,
+          sourceName: 'linkedin_archive',
+          status: 'queued',
+          fileMetadata: {
+            fileName: file.name,
+            fileSize: file.size,
+            uploadedAt: new Date().toISOString(),
+            blobUrl: blob.url,
+            blobPath: blobPath,
+          },
+          progress: 0,
+        },
+      });
+
+      return NextResponse.json({
+        jobId: job.id,
         status: 'queued',
-        fileMetadata: {
-          fileName: file.name,
-          fileSize: file.size,
-          uploadedAt: new Date().toISOString(),
-        },
-        progress: 0,
-      },
-    });
-
-    // Ensure upload directory exists
-    console.log('[LinkedIn Upload] Creating upload directory');
-    const jobDir = join(UPLOAD_DIR, job.id);
-    try {
-      await mkdir(jobDir, { recursive: true });
-    } catch (mkdirError) {
-      console.error('[LinkedIn Upload] Failed to create directory:', mkdirError);
-      throw new Error(`Failed to create upload directory: ${mkdirError instanceof Error ? mkdirError.message : 'Unknown error'}`);
+        message: 'File uploaded successfully. Ready for processing.',
+      });
+    } catch (uploadError) {
+      console.error('[LinkedIn Upload] Failed to upload to blob:', uploadError);
+      throw new Error(`Failed to upload file: ${uploadError instanceof Error ? uploadError.message : 'Unknown error'}`);
     }
-
-    // Save file to disk
-    console.log('[LinkedIn Upload] Saving file to:', jobDir);
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    const filePath = join(jobDir, file.name);
-
-    try {
-      await writeFile(filePath, buffer);
-      console.log('[LinkedIn Upload] File saved successfully');
-    } catch (writeError) {
-      console.error('[LinkedIn Upload] Failed to write file:', writeError);
-      throw new Error(`Failed to save file: ${writeError instanceof Error ? writeError.message : 'Unknown error'}`);
-    }
-
-    // Update job with file path
-    await prisma.ingestJob.update({
-      where: { id: job.id },
-      data: {
-        fileMetadata: {
-          fileName: file.name,
-          fileSize: file.size,
-          uploadedAt: new Date().toISOString(),
-          storagePath: filePath,
-        },
-      },
-    });
-
-    return NextResponse.json({
-      jobId: job.id,
-      status: 'queued',
-      message: 'File uploaded successfully. Ready for processing.',
-    });
   } catch (error) {
     console.error('LinkedIn archive upload error:', error);
     return NextResponse.json(
