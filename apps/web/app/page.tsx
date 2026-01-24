@@ -14,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RequirementsTable } from '@/components/backlog/requirements-table';
 import { NetworkOverview } from '@/components/network/network-overview';
+import { VersionDisplay } from '@/components/common/version-display';
 
 interface Person {
   id: string;
@@ -203,10 +204,15 @@ export default function IntroFinderPage() {
   return (
     <div className="container mx-auto p-4 max-w-7xl">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-2">Warm Intro Graph</h1>
-        <p className="text-muted-foreground">
-          Find warm introduction paths through your professional network
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">Warm Intro Graph</h1>
+            <p className="text-muted-foreground">
+              Find warm introduction paths through your professional network
+            </p>
+          </div>
+          <VersionDisplay />
+        </div>
       </div>
 
       <Tabs defaultValue="finder" className="w-full">
