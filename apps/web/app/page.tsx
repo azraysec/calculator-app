@@ -4,7 +4,7 @@
  * Intro Finder - Main interface for finding warm introduction paths
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ThreePanelLayout } from '@/components/layouts/three-panel-layout';
 import { PersonSearch } from '@/components/people/person-search';
@@ -74,9 +74,11 @@ export default function IntroFinderPage() {
   });
 
   // Auto-select first path when results arrive
-  if (pathsResult?.paths && !selectedPath) {
-    setSelectedPath(pathsResult.paths[0]);
-  }
+  useEffect(() => {
+    if (pathsResult?.paths && pathsResult.paths.length > 0 && !selectedPath) {
+      setSelectedPath(pathsResult.paths[0]);
+    }
+  }, [pathsResult, selectedPath]);
 
   const introFinderContent = (
     <ThreePanelLayout

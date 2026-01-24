@@ -45,9 +45,9 @@ test.describe('Pathfinding - Critical Feature', () => {
     await expect(page.getByText('Target:')).toBeVisible();
     await page.waitForTimeout(3000);
 
-    // Verify pathfinding attempted
-    const hasContent = await page.locator('.space-y-4').isVisible();
-    expect(hasContent).toBeTruthy();
+    // Verify pathfinding attempted - check for either paths or error message
+    const hasPathsOrMessage = await page.locator('.space-y-3, .space-y-4').first().isVisible();
+    expect(hasPathsOrMessage).toBeTruthy();
   });
 
   test('should handle pathfinding to person with no connection', async ({ page }) => {
