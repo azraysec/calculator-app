@@ -42,6 +42,15 @@ const nextConfig = {
     NEXT_PUBLIC_GIT_COMMIT: getGitCommit(),
     NEXT_PUBLIC_BUILD_TIME: new Date().toISOString(),
   },
+  experimental: {
+    serverComponentsExternalPackages: ['@prisma/client', '@prisma/engines']
+  },
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals.push('@prisma/client', '@prisma/engines')
+    }
+    return config
+  },
 };
 
 export default nextConfig;
