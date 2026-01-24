@@ -8,9 +8,9 @@
         - heading "Warm Intro Graph" [level=1] [ref=e6]
         - paragraph [ref=e7]: Find warm introduction paths through your professional network
       - generic [ref=e8]:
-        - generic [ref=e9]: v0.4.0
-        - generic [ref=e10]: 09d6389
-        - generic [ref=e11]: "Built: 1/24/2026 8:51:43 PM"
+        - generic [ref=e9]: v0.5.0
+        - generic [ref=e10]: d842ef6
+        - generic [ref=e11]: "Built: 1/24/2026 9:19:22 PM"
     - generic [ref=e12]:
       - tablist [ref=e13]:
         - tab "Intro Finder" [selected] [ref=e14] [cursor=pointer]
@@ -32,17 +32,13 @@
                     - img [ref=e33]
                     - combobox [expanded] [active] [ref=e36]: Alice
                   - listbox "Suggestions" [ref=e37]:
-                    - option "Alice Johnson VP of Engineering Acme Corporation" [selected] [ref=e39]:
-                      - generic [ref=e40]:
-                        - generic [ref=e41]: Alice Johnson
-                        - generic [ref=e42]: VP of Engineering
-                        - generic [ref=e43]: Acme Corporation
-                - paragraph [ref=e44]: "Tip: You can paste a LinkedIn URL (e.g., linkedin.com/in/username) to search"
-            - generic [ref=e47]:
-              - generic [ref=e48]: No path selected
-              - generic [ref=e49]: Search for a person to see introduction paths
-            - paragraph [ref=e52]: Select a path to view details and generate introduction requests.
-  - button "Open Next.js Dev Tools" [ref=e58] [cursor=pointer]:
-    - img [ref=e59]
-  - alert [ref=e62]
+                    - generic [ref=e39]: Searching...
+                - paragraph [ref=e40]: "Tip: You can paste a LinkedIn URL (e.g., linkedin.com/in/username) to search"
+            - generic [ref=e43]:
+              - generic [ref=e44]: No path selected
+              - generic [ref=e45]: Search for a person to see introduction paths
+            - paragraph [ref=e48]: Select a path to view details and generate introduction requests.
+  - button "Open Next.js Dev Tools" [ref=e54] [cursor=pointer]:
+    - img [ref=e55]
+  - alert [ref=e58]: Warm Intro Graph
 ```
