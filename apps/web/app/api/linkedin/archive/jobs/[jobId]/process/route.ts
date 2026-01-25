@@ -62,10 +62,27 @@ export async function POST(
     });
   } catch (error) {
     console.error('Start job processing error:', error);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack');
+
+    // Update job to failed state
+    try {
+      await prisma.ingestJob.update({
+        where: { id: (await params).jobId },
+        data: {
+          status: 'failed',
+          error: error instanceof Error ? error.message : 'Unknown error',
+          completedAt: new Date(),
+        },
+      });
+    } catch (updateError) {
+      console.error('Failed to update job status:', updateError);
+    }
+
     return NextResponse.json(
       {
         error: 'Failed to start processing',
         details: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
       },
       { status: 500 }
     );

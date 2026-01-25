@@ -162,8 +162,13 @@ export function LinkedInUploadDialog({
       );
 
       if (!processResponse.ok) {
+        const errorData = await processResponse.json();
         addLog('❌ Failed to start processing');
-        throw new Error('Processing failed to start');
+        addLog(`Error: ${errorData.details || errorData.error || 'Unknown error'}`);
+        if (errorData.stack) {
+          console.error('Full error stack:', errorData.stack);
+        }
+        throw new Error(errorData.details || errorData.error || 'Processing failed to start');
       }
 
       addLog('✓ Processing started');

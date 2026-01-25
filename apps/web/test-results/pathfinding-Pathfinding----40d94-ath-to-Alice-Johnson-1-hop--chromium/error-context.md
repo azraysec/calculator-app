@@ -1,0 +1,48 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e4]:
+      - generic [ref=e5]:
+        - heading "Warm Intro Graph" [level=1] [ref=e6]
+        - paragraph [ref=e7]: Find warm introduction paths through your professional network
+      - generic [ref=e8]:
+        - generic [ref=e9]: v0.5.0
+        - generic [ref=e10]: 0102a00
+        - generic [ref=e11]: "Built: 1/24/2026 10:36:52 PM"
+    - generic [ref=e12]:
+      - tablist [ref=e13]:
+        - tab "Intro Finder" [selected] [ref=e14] [cursor=pointer]
+        - tab "My Network" [ref=e15] [cursor=pointer]
+        - tab "Data Sources" [ref=e16] [cursor=pointer]
+        - tab "Changelog" [ref=e17] [cursor=pointer]
+      - tabpanel "Intro Finder" [ref=e18]:
+        - generic [ref=e19]:
+          - banner [ref=e20]:
+            - generic [ref=e21]:
+              - heading "Warm Intro Graph" [level=1] [ref=e22]
+              - generic [ref=e23]: Find warm introduction paths through your network
+          - generic [ref=e24]:
+            - generic [ref=e26]:
+              - generic [ref=e27]:
+                - heading "Find Introduction" [level=2] [ref=e28]
+                - generic [ref=e29]:
+                  - generic [ref=e30]:
+                    - generic [ref=e32]:
+                      - img [ref=e33]
+                      - combobox [expanded] [ref=e36]
+                    - listbox "Suggestions" [active]
+                  - paragraph [ref=e37]: "Tip: You can paste a LinkedIn URL (e.g., linkedin.com/in/username) to search"
+              - generic [ref=e38]:
+                - generic [ref=e39]: "Target:"
+                - generic [ref=e40]: Alice Johnson
+                - generic [ref=e41]: VP of Engineering
+            - generic [ref=e48]:
+              - generic [ref=e49]: No path selected
+              - generic [ref=e50]: Search for a person to see introduction paths
+            - paragraph [ref=e53]: Select a path to view details and generate introduction requests.
+  - button "Open Next.js Dev Tools" [ref=e59] [cursor=pointer]:
+    - img [ref=e60]
+  - alert [ref=e63]
+```
