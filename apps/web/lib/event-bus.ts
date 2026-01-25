@@ -9,6 +9,7 @@ import { Inngest } from 'inngest';
 export const inngest = new Inngest({
   id: 'wig',
   name: 'Warm Intro Graph',
+  eventKey: process.env.INNGEST_EVENT_KEY,
 });
 
 /**
