@@ -48,7 +48,7 @@ export async function POST(
     });
 
     // Trigger background processing via Vercel Queue
-    await linkedInQueue.enqueue({
+    await linkedInQueue.send('linkedin-process', {
       jobId,
     });
 

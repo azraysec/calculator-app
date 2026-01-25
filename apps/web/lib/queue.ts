@@ -2,10 +2,7 @@
  * Vercel Queue Client Configuration
  */
 
-import { Queue } from '@vercel/queue';
+import { Client } from '@vercel/queue';
 
-// LinkedIn archive processing queue
-export const linkedInQueue = new Queue('linkedin-process', {
-  // Queue will invoke /api/queue/linkedin-process
-  invokeUrl: '/api/queue/linkedin-process',
-});
+// LinkedIn archive processing queue client
+export const linkedInQueue = new Client();
