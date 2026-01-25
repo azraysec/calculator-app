@@ -8,7 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { inngest } from '@/lib/event-bus';
+import { linkedInQueue } from '@/lib/queue';
 
 export async function POST(
   _request: NextRequest,
@@ -47,18 +47,15 @@ export async function POST(
       },
     });
 
-    // Trigger background processing via Inngest
-    await inngest.send({
-      name: 'linkedin.archive.process',
-      data: {
-        jobId,
-      },
+    // Trigger background processing via Vercel Queue
+    await linkedInQueue.enqueue({
+      jobId,
     });
 
     return NextResponse.json({
       jobId,
       status: 'running',
-      message: 'Processing started in background',
+      message: 'Processing started in background queue',
     });
   } catch (error) {
     console.error('Start job processing error:', error);

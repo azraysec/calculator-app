@@ -1,6 +1,6 @@
 {
   "name": "@wig/web",
-  "version": "0.5.3",
+  "version": "0.6.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -22,6 +22,7 @@
     "@radix-ui/react-tabs": "^1.1.13",
     "@tanstack/react-query": "^5.90.18",
     "@vercel/blob": "^2.0.1",
+    "@vercel/queue": "0.0.0-alpha.35",
     "@wig/adapters": "workspace:*",
     "@wig/agent-runtime": "workspace:*",
     "@wig/brokers": "workspace:*",

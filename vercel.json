@@ -7,6 +7,14 @@
       "main": true
     }
   },
+  "queues": [
+    {
+      "name": "linkedin-process",
+      "endpoint": "/api/queue/linkedin-process",
+      "maxRetries": 3,
+      "maxDuration": 300
+    }
+  ],
   "headers": [
     {
       "source": "/api/(.*)",

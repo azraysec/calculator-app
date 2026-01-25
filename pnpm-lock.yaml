@@ -47,6 +47,9 @@ importers:
       '@vercel/blob':
         specifier: ^2.0.1
         version: 2.0.1
+      '@vercel/queue':
+        specifier: 0.0.0-alpha.35
+        version: 0.0.0-alpha.35
       '@wig/adapters':
         specifier: workspace:*
         version: link:../../packages/adapters
@@ -2200,6 +2203,14 @@ packages:
     resolution: {integrity: sha512-DeJmC/B5oH1ExazYh/UvjbN6Mg0q0wlDz29GPIPNhi4COjVzqYRkyPYjOcAZd+RgXVzWqGXholZWtGcLCPuL8A==}
     engines: {node: '>=20.0.0'}
 
+  '@vercel/oidc@3.1.0':
+    resolution: {integrity: sha512-Fw28YZpRnA3cAHHDlkt7xQHiJ0fcL+NRcIqsocZQUSmbzeIKRpwttJjik5ZGanXP+vlA4SbTg+AbA3bP363l+w==}
+    engines: {node: '>= 20'}
+
+  '@vercel/queue@0.0.0-alpha.35':
+    resolution: {integrity: sha512-RjtUKwGOdYSvgyDaR9qNjlGdacFZHhdFby/IOP/TYMwfwmRIuQLvF/prXu+FmbaAlUZgHSGGnECZ8uwPICdSWg==}
+    engines: {node: '>=20.0.0'}
+
   '@vitest/expect@2.1.9':
     resolution: {integrity: sha512-UJCIkTBenHeKT1TTlKMJWy1laZewsRIzYighyYiJKZreqtdxSos/S1t+ktRMQWu2CKqaarrkeszJx1cgC5tGZw==}
 
@@ -3291,6 +3302,10 @@ packages:
 
   minimist@1.2.8:
     resolution: {integrity: sha512-2yyAR8qBkN3YuheJanUpWC5U3bb5osDywNB8RzDVlDwDHbocAJveqqj1u8+SVD7jkWT4yvsHCpWqqWqAxb0zCA==}
+
+  mixpart@0.0.5-alpha.1:
+    resolution: {integrity: sha512-2ZfG/NO2SVE9HLk1/W+yOrIOA0d674ljZExLdievZQpYjbJYQjIdye8vNMR63yF7nN/NbO9q8mp16JUEYBCilg==}
+    engines: {node: '>=20.0.0'}
 
   module-details-from-path@1.0.4:
     resolution: {integrity: sha512-EGWKgxALGMgzvxYF1UyGTy0HXX/2vHLkw6+NvDKW2jypWbHpjQuj4UMcqQWXHERJhVGKikolT06G3bcKe4fi7w==}
@@ -6163,6 +6178,13 @@ snapshots:
       throttleit: 2.1.0
       undici: 6.23.0
 
+  '@vercel/oidc@3.1.0': {}
+
+  '@vercel/queue@0.0.0-alpha.35':
+    dependencies:
+      '@vercel/oidc': 3.1.0
+      mixpart: 0.0.5-alpha.1
+
   '@vitest/expect@2.1.9':
     dependencies:
       '@vitest/spy': 2.1.9
@@ -7488,6 +7510,8 @@ snapshots:
       brace-expansion: 2.0.2
 
   minimist@1.2.8: {}
+
+  mixpart@0.0.5-alpha.1: {}
 
   module-details-from-path@1.0.4: {}
 
