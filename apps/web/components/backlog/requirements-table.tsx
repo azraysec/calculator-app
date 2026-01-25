@@ -242,6 +242,17 @@ const REQUIREMENTS: Requirement[] = [
     dateStarted: '2026-01-24',
     dateCompleted: '2026-01-24',
   },
+  {
+    id: 'BUG-021',
+    requirement: 'Fix LinkedIn upload timeout in serverless environment',
+    priority: 'Critical',
+    status: 'Done',
+    category: 'Bug Fix',
+    notes: 'Moved LinkedIn archive processing to Inngest background worker. Serverless functions timeout at 60s, but large archives take 20+ min. Now processes in background with no timeout limits.',
+    dateAdded: '2026-01-24',
+    dateStarted: '2026-01-24',
+    dateCompleted: '2026-01-24',
+  },
 ];
 
 type SortField = keyof Requirement;
