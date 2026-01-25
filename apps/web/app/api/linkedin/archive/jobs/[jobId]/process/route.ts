@@ -8,11 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { LinkedInArchiveParser } from '@wig/adapters';
-import { LinkedInRelationshipScorer } from '@wig/core';
-import { writeFile, unlink } from 'fs/promises';
-import { join } from 'path';
-import { tmpdir } from 'os';
+import { inngest } from '@/lib/event-bus';
 
 export async function POST(
   _request: NextRequest,
@@ -47,28 +43,22 @@ export async function POST(
         status: 'running',
         startedAt: new Date(),
         progress: 0,
+        logs: 'Job queued for processing...',
       },
     });
 
-    // Process archive asynchronously
-    // For now, we'll do a simple simulation
-    // In production, this would trigger a background job (Inngest, queue, etc.)
-    processArchiveAsync(jobId).catch((error) => {
-      console.error('Archive processing failed:', error);
-      prisma.ingestJob.update({
-        where: { id: jobId },
-        data: {
-          status: 'failed',
-          completedAt: new Date(),
-          error: error instanceof Error ? error.message : 'Processing failed',
-        },
-      });
+    // Trigger background processing via Inngest
+    await inngest.send({
+      name: 'linkedin.archive.process',
+      data: {
+        jobId,
+      },
     });
 
     return NextResponse.json({
       jobId,
       status: 'running',
-      message: 'Processing started',
+      message: 'Processing started in background',
     });
   } catch (error) {
     console.error('Start job processing error:', error);
@@ -79,111 +69,5 @@ export async function POST(
       },
       { status: 500 }
     );
-  }
-}
-
-/**
- * Process archive asynchronously using LinkedInArchiveParser
- */
-async function processArchiveAsync(jobId: string) {
-  let tempFilePath: string | null = null;
-
-  try {
-    // Get job to retrieve blob URL
-    const job = await prisma.ingestJob.findUnique({
-      where: { id: jobId },
-    });
-
-    if (!job) {
-      throw new Error('Job not found');
-    }
-
-    const fileMetadata = job.fileMetadata as any;
-    const blobUrl = fileMetadata?.blobUrl;
-
-    if (!blobUrl) {
-      throw new Error('Blob URL not found in job metadata');
-    }
-
-    // Download file from Vercel Blob to temp location
-    console.log('[LinkedIn Process] Downloading from blob:', blobUrl);
-    const response = await fetch(blobUrl);
-    if (!response.ok) {
-      throw new Error(`Failed to download file from blob: ${response.statusText}`);
-    }
-
-    const arrayBuffer = await response.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    // Save to temp file
-    tempFilePath = join(tmpdir(), `linkedin-archive-${jobId}.zip`);
-    await writeFile(tempFilePath, buffer);
-    console.log('[LinkedIn Process] File downloaded to temp:', tempFilePath);
-
-    // Create parser with progress callback
-    const parser = new LinkedInArchiveParser(
-      prisma,
-      job.userId,
-      (progress) => {
-        // Update job progress
-        prisma.ingestJob.update({
-          where: { id: jobId },
-          data: {
-            progress: progress.progress,
-            logs: progress.message,
-          },
-        }).catch((err) => {
-          console.error('Failed to update progress:', err);
-        });
-      }
-    );
-
-    // Parse the archive
-    const result = await parser.parseArchive(tempFilePath);
-
-    // Re-score relationships using LinkedIn evidence
-    const scorer = new LinkedInRelationshipScorer(prisma);
-    const rescored = await scorer.rescorePersonEdges(job.userId);
-
-    // Complete job with results
-    await prisma.ingestJob.update({
-      where: { id: jobId },
-      data: {
-        status: result.errors.length > 0 ? 'completed' : 'completed', // Always complete, but log errors
-        completedAt: new Date(),
-        progress: 100,
-        resultMetadata: {
-          connectionsProcessed: result.connectionsProcessed,
-          messagesProcessed: result.messagesProcessed,
-          evidenceEventsCreated: result.evidenceEventsCreated,
-          newPersonsAdded: result.newPersonsAdded,
-          edgesRescored: rescored,
-          errors: result.errors,
-        },
-        logs: result.errors.length > 0
-          ? `Completed with ${result.errors.length} errors`
-          : 'Completed successfully',
-      },
-    });
-
-    // Clean up temp file
-    if (tempFilePath) {
-      try {
-        await unlink(tempFilePath);
-        console.log('[LinkedIn Process] Temp file cleaned up');
-      } catch (unlinkError) {
-        console.error('[LinkedIn Process] Failed to delete temp file:', unlinkError);
-      }
-    }
-  } catch (error) {
-    // Clean up temp file on error
-    if (tempFilePath) {
-      try {
-        await unlink(tempFilePath);
-      } catch (unlinkError) {
-        console.error('[LinkedIn Process] Failed to delete temp file on error:', unlinkError);
-      }
-    }
-    throw error;
   }
 }

@@ -3,6 +3,12 @@
  */
 
 import { inngest } from './event-bus';
+import { prisma } from './prisma';
+import { LinkedInArchiveParser } from '@wig/adapters';
+import { LinkedInRelationshipScorer } from '@wig/core';
+import { writeFile, unlink } from 'fs/promises';
+import { join } from 'path';
+import { tmpdir } from 'os';
 
 /**
  * Handle contacts.ingested events
@@ -146,6 +152,143 @@ export const handleSyncFailed = inngest.createFunction(
   }
 );
 
+/**
+ * Process LinkedIn archive in background
+ * No serverless timeout - can take as long as needed
+ */
+export const processLinkedInArchive = inngest.createFunction(
+  {
+    id: 'process-linkedin-archive',
+    name: 'Process LinkedIn Archive',
+    concurrency: {
+      limit: 5, // Process max 5 archives simultaneously
+    },
+  },
+  { event: 'linkedin.archive.process' },
+  async ({ event, step }) => {
+    const { jobId } = event.data;
+
+    // Step 1: Download file from blob
+    const { blobUrl, userId } = await step.run('download-from-blob', async () => {
+      const job = await prisma.ingestJob.findUnique({
+        where: { id: jobId },
+      });
+
+      if (!job) {
+        throw new Error('Job not found');
+      }
+
+      const fileMetadata = job.fileMetadata as any;
+      const blobUrl = fileMetadata?.blobUrl;
+
+      if (!blobUrl) {
+        throw new Error('Blob URL not found in job metadata');
+      }
+
+      await prisma.ingestJob.update({
+        where: { id: jobId },
+        data: { progress: 5, logs: 'Downloading file from storage...' },
+      });
+
+      return { blobUrl, userId: job.userId };
+    });
+
+    // Step 2: Download and save to temp file
+    const tempFilePath = await step.run('save-temp-file', async () => {
+      const response = await fetch(blobUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to download file from blob: ${response.statusText}`);
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      const tempPath = join(tmpdir(), `linkedin-archive-${jobId}.zip`);
+      await writeFile(tempPath, buffer);
+
+      await prisma.ingestJob.update({
+        where: { id: jobId },
+        data: { progress: 10, logs: 'File downloaded, starting extraction...' },
+      });
+
+      return tempPath;
+    });
+
+    // Step 3: Parse the archive
+    const parseResult = await step.run('parse-archive', async () => {
+      const parser = new LinkedInArchiveParser(
+        prisma,
+        userId,
+        (progress) => {
+          prisma.ingestJob.update({
+            where: { id: jobId },
+            data: {
+              progress: 10 + (progress.progress * 0.7), // 10-80%
+              logs: progress.message,
+            },
+          }).catch((err) => {
+            console.error('Failed to update progress:', err);
+          });
+        }
+      );
+
+      try {
+        const result = await parser.parseArchive(tempFilePath);
+        return result;
+      } finally {
+        // Clean up temp file
+        try {
+          await unlink(tempFilePath);
+        } catch (err) {
+          console.error('Failed to delete temp file:', err);
+        }
+      }
+    });
+
+    // Step 4: Re-score relationships
+    const rescoredCount = await step.run('rescore-relationships', async () => {
+      await prisma.ingestJob.update({
+        where: { id: jobId },
+        data: { progress: 85, logs: 'Scoring relationship strengths...' },
+      });
+
+      const scorer = new LinkedInRelationshipScorer(prisma);
+      const rescored = await scorer.rescorePersonEdges(userId);
+
+      return rescored;
+    });
+
+    // Step 5: Complete job
+    await step.run('complete-job', async () => {
+      await prisma.ingestJob.update({
+        where: { id: jobId },
+        data: {
+          status: parseResult.errors.length > 0 ? 'completed' : 'completed',
+          completedAt: new Date(),
+          progress: 100,
+          resultMetadata: {
+            connectionsProcessed: parseResult.connectionsProcessed,
+            messagesProcessed: parseResult.messagesProcessed,
+            evidenceEventsCreated: parseResult.evidenceEventsCreated,
+            newPersonsAdded: parseResult.newPersonsAdded,
+            edgesRescored: rescoredCount,
+            errors: parseResult.errors,
+          },
+          logs: parseResult.errors.length > 0
+            ? `Completed with ${parseResult.errors.length} errors`
+            : 'Completed successfully',
+        },
+      });
+    });
+
+    return {
+      connectionsProcessed: parseResult.connectionsProcessed,
+      messagesProcessed: parseResult.messagesProcessed,
+      edgesRescored: rescoredCount,
+    };
+  }
+);
+
 // Export all functions as an array for easy registration
 export const inngestFunctions = [
   handleContactsIngested,
@@ -155,4 +298,5 @@ export const inngestFunctions = [
   handleSyncStarted,
   handleSyncCompleted,
   handleSyncFailed,
+  processLinkedInArchive,
 ];
