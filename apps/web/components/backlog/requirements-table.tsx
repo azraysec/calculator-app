@@ -253,6 +253,17 @@ const REQUIREMENTS: Requirement[] = [
     dateStarted: '2026-01-24',
     dateCompleted: '2026-01-24',
   },
+  {
+    id: 'BUG-022',
+    requirement: 'Fix Inngest event sending - missing eventKey configuration',
+    priority: 'Critical',
+    status: 'Done',
+    category: 'Bug Fix',
+    notes: 'inngest.send() was failing with "Failed to start processing". Inngest client needs eventKey configured to send events. Added process.env.INNGEST_EVENT_KEY to client constructor.',
+    dateAdded: '2026-01-24 20:52:00',
+    dateStarted: '2026-01-24 20:52:00',
+    dateCompleted: '2026-01-24 20:58:00',
+  },
 ];
 
 type SortField = keyof Requirement;
