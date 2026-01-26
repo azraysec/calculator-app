@@ -3,7 +3,7 @@
  * Processes LinkedIn archives without serverless timeout limits
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { handleCallback } from '@vercel/queue';
 import { prisma } from '@/lib/prisma';
 import { LinkedInArchiveParser } from '@wig/adapters';
 import { LinkedInRelationshipScorer } from '@wig/core';
@@ -13,19 +13,20 @@ import { tmpdir } from 'os';
 
 export const maxDuration = 300; // 5 minutes max
 
-export async function POST(request: NextRequest) {
-  try {
-    const { jobId } = await request.json();
+export const POST = handleCallback({
+  'linkedin-process': {
+    'default': async (message: { jobId: string }) => {
+      const { jobId } = message;
 
-    if (!jobId) {
-      return NextResponse.json({ error: 'Missing jobId' }, { status: 400 });
-    }
+      if (!jobId) {
+        throw new Error('Missing jobId');
+      }
 
-    console.log(`[Queue Consumer] Processing job: ${jobId}`);
+      console.log(`[Queue Consumer] Processing job: ${jobId}`);
 
-    let tempFilePath: string | null = null;
+      let tempFilePath: string | null = null;
 
-    try {
+      try {
       // Step 1: Get job and blob URL
       const job = await prisma.ingestJob.findUnique({
         where: { id: jobId },
@@ -134,16 +135,6 @@ export async function POST(request: NextRequest) {
           console.error('Failed to delete temp file:', unlinkError);
         }
       }
-
-      return NextResponse.json({
-        success: true,
-        jobId,
-        result: {
-          connectionsProcessed: result.connectionsProcessed,
-          messagesProcessed: result.messagesProcessed,
-          edgesRescored: rescoredCount,
-        },
-      });
     } catch (error) {
       console.error(`[Queue Consumer] Processing error:`, error);
 
@@ -169,14 +160,6 @@ export async function POST(request: NextRequest) {
 
       throw error;
     }
-  } catch (error) {
-    console.error('[Queue Consumer] Fatal error:', error);
-    return NextResponse.json(
-      {
-        error: 'Queue processing failed',
-        details: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    );
-  }
-}
+    },
+  },
+});
