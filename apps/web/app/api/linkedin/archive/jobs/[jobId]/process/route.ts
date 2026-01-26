@@ -8,7 +8,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { linkedInQueue } from '@/lib/queue';
 
 export async function POST(
   _request: NextRequest,
@@ -36,7 +35,7 @@ export async function POST(
       );
     }
 
-    // Update job status to running
+    // Update job status to running - cron job will pick it up
     await prisma.ingestJob.update({
       where: { id: jobId },
       data: {
@@ -47,15 +46,10 @@ export async function POST(
       },
     });
 
-    // Trigger background processing via Vercel Queue
-    await linkedInQueue.send('linkedin-process', {
-      jobId,
-    });
-
     return NextResponse.json({
       jobId,
       status: 'running',
-      message: 'Processing started in background queue',
+      message: 'Processing will start within 1 minute via cron job',
     });
   } catch (error) {
     console.error('Start job processing error:', error);

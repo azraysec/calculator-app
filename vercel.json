@@ -7,12 +7,10 @@
       "main": true
     }
   },
-  "queues": [
+  "crons": [
     {
-      "name": "linkedin-process",
-      "endpoint": "/api/queue/linkedin-process",
-      "maxRetries": 3,
-      "maxDuration": 300
+      "path": "/api/cron/linkedin-process",
+      "schedule": "* * * * *"
     }
   ],
   "headers": [
