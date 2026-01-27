@@ -120,8 +120,8 @@ export class LinkedInArchiveParser {
         relax_column_count: true,
       }) as Array<Record<string, string>>;
 
-      // Get "me" person
-      const mePerson = await this.prisma.person.findFirst({
+      // Get or create "me" person
+      let mePerson = await this.prisma.person.findFirst({
         where: {
           emails: { has: this.userId },
           deletedAt: null,
@@ -129,8 +129,18 @@ export class LinkedInArchiveParser {
       });
 
       if (!mePerson) {
-        result.errors.push('Could not find "me" person in database');
-        return result;
+        // Create the user's Person record if it doesn't exist
+        mePerson = await this.prisma.person.create({
+          data: {
+            names: [this.userId], // Temporary name, user can update later
+            emails: [this.userId],
+            metadata: {
+              isMe: true,
+              source: 'linkedin_archive',
+              createdAt: new Date().toISOString(),
+            },
+          },
+        });
       }
 
       // Process each connection
@@ -223,8 +233,8 @@ export class LinkedInArchiveParser {
         relax_column_count: true,
       }) as Array<Record<string, string>>;
 
-      // Get "me" person
-      const mePerson = await this.prisma.person.findFirst({
+      // Get or create "me" person
+      let mePerson = await this.prisma.person.findFirst({
         where: {
           emails: { has: this.userId },
           deletedAt: null,
@@ -232,8 +242,18 @@ export class LinkedInArchiveParser {
       });
 
       if (!mePerson) {
-        result.errors.push('Could not find "me" person in database');
-        return result;
+        // Create the user's Person record if it doesn't exist
+        mePerson = await this.prisma.person.create({
+          data: {
+            names: [this.userId], // Temporary name, user can update later
+            emails: [this.userId],
+            metadata: {
+              isMe: true,
+              source: 'linkedin_archive',
+              createdAt: new Date().toISOString(),
+            },
+          },
+        });
       }
 
       // Group messages by conversation
