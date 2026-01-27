@@ -120,7 +120,20 @@ export class LinkedInArchiveParser {
     };
 
     try {
-      const records = parseCsv(csvContent, {
+      // LinkedIn CSVs have a "Notes:" header section - skip it
+      let cleanedContent = csvContent;
+      if (csvContent.startsWith('Notes:')) {
+        // Skip lines until we find the actual CSV headers (contains "First Name")
+        const lines = csvContent.split('\n');
+        const headerIndex = lines.findIndex(line =>
+          line.includes('First Name') || line.includes('first name')
+        );
+        if (headerIndex !== -1) {
+          cleanedContent = lines.slice(headerIndex).join('\n');
+        }
+      }
+
+      const records = parseCsv(cleanedContent, {
         columns: true,
         skip_empty_lines: true,
         trim: true,
@@ -239,7 +252,19 @@ export class LinkedInArchiveParser {
     };
 
     try {
-      const records = parseCsv(csvContent, {
+      // LinkedIn CSVs may have a "Notes:" header section - skip it
+      let cleanedContent = csvContent;
+      if (csvContent.startsWith('Notes:')) {
+        const lines = csvContent.split('\n');
+        const headerIndex = lines.findIndex(line =>
+          line.includes('CONVERSATION ID') || line.includes('conversation id')
+        );
+        if (headerIndex !== -1) {
+          cleanedContent = lines.slice(headerIndex).join('\n');
+        }
+      }
+
+      const records = parseCsv(cleanedContent, {
         columns: true,
         skip_empty_lines: true,
         trim: true,
