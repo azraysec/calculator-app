@@ -55,9 +55,16 @@ export class LinkedInArchiveParser {
       const zip = new AdmZip(filePath);
       const entries = zip.getEntries();
 
+      // Debug: Log all entry names
+      console.log('[Parser] Archive contains files:');
+      entries.forEach(e => console.log(`  - ${e.entryName}`));
+
       // Find CSV files (case-insensitive)
       const connectionsFile = this.findFile(entries, 'connections.csv');
       const messagesFile = this.findFile(entries, 'messages.csv');
+
+      console.log('[Parser] Found connectionsFile:', connectionsFile?.entryName || 'NOT FOUND');
+      console.log('[Parser] Found messagesFile:', messagesFile?.entryName || 'NOT FOUND');
 
       // Parse Connections.csv
       if (connectionsFile) {
@@ -119,6 +126,12 @@ export class LinkedInArchiveParser {
         trim: true,
         relax_column_count: true,
       }) as Array<Record<string, string>>;
+
+      console.log(`[Parser] Parsed ${records.length} connection records from CSV`);
+      if (records.length > 0) {
+        console.log('[Parser] First connection record keys:', Object.keys(records[0]));
+        console.log('[Parser] First connection record sample:', JSON.stringify(records[0]).substring(0, 200));
+      }
 
       // Get or create "me" person
       let mePerson = await this.prisma.person.findFirst({
