@@ -59,6 +59,8 @@ interface DataSource {
   displayName: string;
   type: 'oauth' | 'archive' | 'api';
   status: 'not_connected' | 'connected' | 'syncing' | 'error';
+  progress?: number; // Progress percentage (0-100)
+  jobId?: string; // Current processing job ID
   lastSync?: Date;
   recordCount?: {
     connections?: number;
@@ -177,16 +179,91 @@ export default function IntroFinderPage() {
     console.log('Syncing', sourceId);
   };
 
-  const handleUploadComplete = (_jobId: string) => {
-    // Update LinkedIn source status
+  const handleUploadComplete = (jobId: string) => {
+    // Update LinkedIn source status and start polling
     setSources((prev) =>
       prev.map((s) =>
         s.id === 'linkedin'
-          ? { ...s, status: 'syncing' as const, lastSync: new Date() }
+          ? { ...s, status: 'syncing' as const, jobId, progress: 0, lastSync: new Date() }
           : s
       )
     );
     setLinkedInDialogOpen(false);
+
+    // Start polling for job progress
+    pollJobProgress(jobId);
+  };
+
+  const pollJobProgress = async (jobId: string) => {
+    const pollInterval = setInterval(async () => {
+      try {
+        const response = await fetch(`/api/linkedin/archive/jobs/${jobId}`);
+        if (!response.ok) {
+          clearInterval(pollInterval);
+          setSources(prev =>
+            prev.map(s =>
+              s.id === 'linkedin' && s.jobId === jobId
+                ? { ...s, status: 'error' as const, error: 'Failed to fetch job status' }
+                : s
+            )
+          );
+          return;
+        }
+
+        const job = await response.json();
+
+        // Update progress
+        setSources(prev =>
+          prev.map(s =>
+            s.id === 'linkedin' && s.jobId === jobId
+              ? { ...s, progress: job.progress || 0 }
+              : s
+          )
+        );
+
+        // Check if completed
+        if (job.status === 'completed') {
+          clearInterval(pollInterval);
+          setSources(prev =>
+            prev.map(s =>
+              s.id === 'linkedin' && s.jobId === jobId
+                ? {
+                    ...s,
+                    status: 'connected' as const,
+                    progress: 100,
+                    recordCount: {
+                      connections: job.resultMetadata?.connectionsProcessed || 0,
+                      messages: job.resultMetadata?.messagesProcessed || 0,
+                    },
+                  }
+                : s
+            )
+          );
+        } else if (job.status === 'failed') {
+          clearInterval(pollInterval);
+          setSources(prev =>
+            prev.map(s =>
+              s.id === 'linkedin' && s.jobId === jobId
+                ? { ...s, status: 'error' as const, error: job.error || 'Processing failed' }
+                : s
+            )
+          );
+        }
+      } catch (error) {
+        console.error('Error polling job status:', error);
+        clearInterval(pollInterval);
+        setSources(prev =>
+          prev.map(s =>
+            s.id === 'linkedin' && s.jobId === jobId
+              ? { ...s, status: 'error' as const, error: 'Failed to check job status' }
+              : s
+          )
+        );
+      }
+    }, 2000); // Poll every 2 seconds
+
+    // Cleanup after 5 minutes max
+    setTimeout(() => clearInterval(pollInterval), 5 * 60 * 1000);
   };
 
   const connectedSources = sources.filter((s) => s.status !== 'not_connected');

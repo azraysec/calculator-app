@@ -8,6 +8,7 @@
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { RefreshCw, Upload, CheckCircle2, XCircle, Clock, Settings } from 'lucide-react';
 
 interface SourceCardProps {
@@ -16,6 +17,7 @@ interface SourceCardProps {
     displayName: string;
     type: 'oauth' | 'archive' | 'api';
     status: 'not_connected' | 'connected' | 'syncing' | 'error';
+    progress?: number; // Progress percentage (0-100)
     lastSync?: Date;
     recordCount?: {
       connections?: number;
@@ -100,6 +102,17 @@ export function SourceCard({ source, onConnect, onSync, onClick }: SourceCardPro
 
       {/* Description */}
       <p className="text-sm text-muted-foreground mb-4">{source.description}</p>
+
+      {/* Progress Bar (shown when syncing) */}
+      {isSyncing && source.progress !== undefined && (
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs text-muted-foreground">Processing...</span>
+            <span className="text-xs font-medium">{source.progress}%</span>
+          </div>
+          <Progress value={source.progress} className="h-2" />
+        </div>
+      )}
 
       {/* Stats */}
       {isConnected && source.recordCount && (
