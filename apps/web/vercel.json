@@ -37,5 +37,11 @@
       "source": "/health/ready",
       "destination": "/api/health/ready"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/linkedin-process",
+      "schedule": "* * * * *"
+    }
   ]
 }

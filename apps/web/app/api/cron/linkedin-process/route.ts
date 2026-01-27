@@ -16,9 +16,19 @@ export const maxDuration = 300; // 5 minutes max
 export async function GET() {
   console.log('[Cron] Checking for pending LinkedIn jobs...');
 
-  // Find oldest pending job
+  // Find oldest pending job (queued or stuck in running state for >5 minutes)
+  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+
   const job = await prisma.ingestJob.findFirst({
-    where: { status: 'running' },
+    where: {
+      sourceName: 'linkedin_archive',
+      status: { in: ['queued', 'running'] },
+      completedAt: null,
+      OR: [
+        { status: 'queued' }, // Process all queued jobs immediately
+        { status: 'running', startedAt: { lt: fiveMinutesAgo } }, // Only process running jobs stuck for >5 min
+      ],
+    },
     orderBy: { createdAt: 'asc' },
   });
 
@@ -27,11 +37,21 @@ export async function GET() {
     return NextResponse.json({ message: 'No pending jobs' });
   }
 
-  console.log(`[Cron] Processing job: ${job.id}`);
+  console.log(`[Cron] Processing job: ${job.id} (status: ${job.status})`);
 
   let tempFilePath: string | null = null;
 
   try {
+    // Reset job to running state (in case it was stuck)
+    await prisma.ingestJob.update({
+      where: { id: job.id },
+      data: {
+        status: 'running',
+        startedAt: new Date(),
+        logs: '[Cron] Starting processing...',
+      },
+    });
+
     // Step 1: Get blob URL
     const fileMetadata = job.fileMetadata as any;
     const blobUrl = fileMetadata?.blobUrl;
