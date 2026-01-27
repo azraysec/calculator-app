@@ -183,7 +183,13 @@ export class LinkedInArchiveParser {
             continue; // Skip empty rows
           }
 
-          const fullName = `${firstName || ''} ${lastName || ''}`.trim();
+          // Build full name, avoiding double spaces
+          const nameParts = [firstName, lastName].filter(Boolean);
+          const fullName = nameParts.join(' ').trim();
+
+          if (!fullName) {
+            continue; // Skip if no valid name
+          }
 
           // Upsert person
           const person = await this.upsertPerson({
@@ -201,7 +207,7 @@ export class LinkedInArchiveParser {
           await this.upsertEdge(mePerson.id, person.person.id, {
             relationshipType: 'connected_to',
             sources: ['linkedin_archive'],
-            firstSeenAt: connectedOn ? new Date(connectedOn) : new Date(),
+            firstSeenAt: connectedOn ? this.parseDate(connectedOn) : new Date(),
           });
 
           // Create evidence event
@@ -210,7 +216,7 @@ export class LinkedInArchiveParser {
               subjectPersonId: mePerson.id,
               objectPersonId: person.person.id,
               type: 'linkedin_connection',
-              timestamp: connectedOn ? new Date(connectedOn) : new Date(),
+              timestamp: connectedOn ? this.parseDate(connectedOn) : new Date(),
               source: 'linkedin_archive',
               metadata: {
                 connectedOn,
@@ -309,13 +315,36 @@ export class LinkedInArchiveParser {
       // Process each conversation
       for (const [conversationId, messages] of conversationMap.entries()) {
         try {
-          // Create conversation record
-          await this.prisma.conversation.create({
-            data: {
+          // Get unique participants from all messages in this conversation
+          const participantNames = new Set<string>();
+          for (const msg of messages) {
+            const fromName = msg['FROM'] || msg['from'];
+            const toName = msg['TO'] || msg['to'];
+            if (fromName) participantNames.add(fromName);
+            if (toName) participantNames.add(toName);
+          }
+
+          // Upsert conversation record
+          const conversation = await this.prisma.conversation.upsert({
+            where: {
+              sourceName_externalId: {
+                sourceName: 'linkedin',
+                externalId: conversationId,
+              },
+            },
+            create: {
               externalId: conversationId,
               sourceName: 'linkedin',
-              participants: [], // Will be updated as we process messages
-              metadata: {},
+              participants: Array.from(participantNames),
+              metadata: {
+                messageCount: messages.length,
+              },
+            },
+            update: {
+              participants: Array.from(participantNames),
+              metadata: {
+                messageCount: messages.length,
+              },
             },
           });
 
@@ -323,25 +352,78 @@ export class LinkedInArchiveParser {
           for (const msg of messages) {
             const fromName = msg['FROM'] || msg['from'];
             const toName = msg['TO'] || msg['to'];
+            const fromProfileUrl = msg['SENDER PROFILE URL'] || msg['sender profile url'];
+            const toProfileUrls = msg['RECIPIENT PROFILE URLS'] || msg['recipient profile urls'];
             const date = msg['DATE'] || msg['date'];
             const content = msg['CONTENT'] || msg['content'];
+            const subject = msg['SUBJECT'] || msg['subject'];
 
-            // Create evidence event for each message
+            if (!fromName || !toName) {
+              continue; // Skip messages without sender/recipient
+            }
+
+            // Determine if this is a sent or received message by comparing with mePerson
+            // LinkedIn exports show your actual name, not "me"
+            const isSentByMe = mePerson.names.some(name =>
+              fromName.toLowerCase().includes(name.toLowerCase()) ||
+              name.toLowerCase().includes(fromName.toLowerCase())
+            );
+
+            // Get or create the other person (not me)
+            const otherPersonName = isSentByMe ? toName : fromName;
+            const otherPersonProfileUrl = isSentByMe ? toProfileUrls : fromProfileUrl;
+
+            // Try to find or create the other person
+            let otherPerson = await this.prisma.person.findFirst({
+              where: {
+                names: {
+                  has: otherPersonName,
+                },
+                deletedAt: null,
+              },
+            });
+
+            if (!otherPerson) {
+              // Create new person for message participant
+              otherPerson = await this.prisma.person.create({
+                data: {
+                  names: [otherPersonName],
+                  emails: [],
+                  metadata: {
+                    linkedin: {
+                      profileUrl: otherPersonProfileUrl,
+                    },
+                  },
+                },
+              });
+            }
+
+            // Create or update edge between me and other person
+            await this.upsertEdge(
+              isSentByMe ? mePerson.id : otherPerson.id,
+              isSentByMe ? otherPerson.id : mePerson.id,
+              {
+                relationshipType: 'messaged',
+                sources: ['linkedin_archive'],
+                firstSeenAt: date ? this.parseDate(date) : new Date(),
+              }
+            );
+
+            // Create evidence event
             await this.prisma.evidenceEvent.create({
               data: {
-                subjectPersonId: mePerson.id,
-                objectPersonId: mePerson.id, // Simplified - should resolve actual person
-                type:
-                  fromName === 'me'
-                    ? 'linkedin_message_sent'
-                    : 'linkedin_message_received',
-                timestamp: date ? new Date(date) : new Date(),
+                subjectPersonId: isSentByMe ? mePerson.id : otherPerson.id,
+                objectPersonId: isSentByMe ? otherPerson.id : mePerson.id,
+                type: isSentByMe ? 'linkedin_message_sent' : 'linkedin_message_received',
+                timestamp: date ? this.parseDate(date) : new Date(),
                 source: 'linkedin_archive',
                 metadata: {
                   conversationId,
                   from: fromName,
                   to: toName,
+                  subject: subject || null,
                   contentLength: content?.length || 0,
+                  content: content?.substring(0, 500) || '', // Store first 500 chars
                 },
               },
             });
@@ -460,6 +542,44 @@ export class LinkedInArchiveParser {
         (entry) => entry.entryName.toLowerCase().endsWith(fileName.toLowerCase())
       ) || null
     );
+  }
+
+  /**
+   * Parse LinkedIn date formats
+   * Handles formats like "12 Jan 2026" and "2026-01-12 22:44:18 UTC"
+   */
+  private parseDate(dateString: string): Date {
+    try {
+      // Try parsing as-is first
+      const parsed = new Date(dateString);
+      if (!isNaN(parsed.getTime())) {
+        return parsed;
+      }
+
+      // Handle LinkedIn's "DD Mon YYYY" format (e.g., "12 Jan 2026")
+      const monthMap: Record<string, number> = {
+        jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+        jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+      };
+
+      const parts = dateString.trim().split(/\s+/);
+      if (parts.length === 3) {
+        const day = parseInt(parts[0], 10);
+        const month = monthMap[parts[1].toLowerCase()];
+        const year = parseInt(parts[2], 10);
+
+        if (!isNaN(day) && month !== undefined && !isNaN(year)) {
+          return new Date(year, month, day);
+        }
+      }
+
+      // Fallback to current date
+      console.warn(`[Parser] Could not parse date: ${dateString}, using current date`);
+      return new Date();
+    } catch (error) {
+      console.warn(`[Parser] Error parsing date: ${dateString}`, error);
+      return new Date();
+    }
   }
 
   /**

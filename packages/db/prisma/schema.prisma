@@ -455,6 +455,7 @@ model Conversation {
 
   // Performance indexes
   @@index([sourceName, externalId])
+  @@unique([sourceName, externalId])
   @@index([participants])
   @@map("conversations")
 }
