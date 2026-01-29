@@ -160,6 +160,36 @@ export default function IntroFinderPage() {
 
   const isLoading = isLoadingPaths;
 
+  // Fetch evidence for selected path
+  const { data: evidenceData } = useQuery<{
+    edges: Array<{
+      edgeId: string;
+      fromPersonName: string;
+      toPersonName: string;
+      evidence: Array<{
+        id: string;
+        type: string;
+        timestamp: Date;
+        source: string;
+        metadata?: Record<string, any>;
+      }>;
+    }>;
+  }>({
+    queryKey: ['evidence', selectedPath?.edges.map((e) => e.id).join(',')],
+    queryFn: async () => {
+      if (!selectedPath || selectedPath.edges.length === 0) {
+        return { edges: [] };
+      }
+      const edgeIds = selectedPath.edges.map((e) => e.id).join(',');
+      const res = await fetch(`/api/evidence?edgeIds=${edgeIds}`);
+      if (!res.ok) {
+        throw new Error('Failed to fetch evidence');
+      }
+      return res.json();
+    },
+    enabled: !!selectedPath && selectedPath.edges.length > 0,
+  });
+
   // Auto-select first path when results arrive
   useEffect(() => {
     if (pathsResult?.paths && pathsResult.paths.length > 0 && !selectedPath) {
@@ -410,7 +440,7 @@ export default function IntroFinderPage() {
               </TabsContent>
 
               <TabsContent value="evidence" className="mt-4">
-                <EvidenceViewer />
+                <EvidenceViewer pathEdges={evidenceData?.edges} />
               </TabsContent>
             </Tabs>
           ) : (

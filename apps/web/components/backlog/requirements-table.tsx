@@ -385,6 +385,17 @@ const REQUIREMENTS: Requirement[] = [
     dateStarted: '2026-01-30',
     dateCompleted: '2026-01-30',
   },
+  {
+    id: 'BUG-031',
+    requirement: 'Fix evidence viewer not showing evidence data',
+    priority: 'High',
+    status: 'Done',
+    category: 'Bug Fix',
+    notes: 'Evidence viewer was not receiving data - EvidenceViewer component called without props. Created /api/evidence endpoint to fetch evidence events for path edges. Added useQuery to fetch evidence when path is selected. Evidence now displays correctly with source badges, timestamps, and metadata.',
+    dateAdded: '2026-01-30',
+    dateStarted: '2026-01-30',
+    dateCompleted: '2026-01-30',
+  },
 ];
 
 type SortField = keyof Requirement;
