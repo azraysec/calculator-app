@@ -20,7 +20,7 @@ import { SourceCard } from '@/components/data-sources/source-card';
 import { SyncHealthWidget } from '@/components/data-sources/sync-health-widget';
 import { LinkedInUploadDialog } from '@/components/data-sources/linkedin-upload-dialog';
 import { LinkedInUploadHistory } from '@/components/data-sources/linkedin-upload-history';
-import { Card } from '@/components/ui/card';
+import { ConnectionsGrid } from '@/components/connections/connections-grid';
 
 interface Person {
   id: string;
@@ -422,6 +422,7 @@ export default function IntroFinderPage() {
         <TabsList className="mb-4">
           <TabsTrigger value="finder">Intro Finder</TabsTrigger>
           <TabsTrigger value="network">My Network</TabsTrigger>
+          <TabsTrigger value="connections">Connections</TabsTrigger>
           <TabsTrigger value="sources">Data Sources</TabsTrigger>
           <TabsTrigger value="changelog">Changelog</TabsTrigger>
         </TabsList>
@@ -432,6 +433,18 @@ export default function IntroFinderPage() {
 
         <TabsContent value="network" className="mt-0">
           <NetworkOverview />
+        </TabsContent>
+
+        <TabsContent value="connections" className="mt-0">
+          <div className="space-y-4">
+            <div>
+              <h2 className="text-2xl font-bold mb-2">Connections</h2>
+              <p className="text-muted-foreground">
+                Browse and filter all connections in your network
+              </p>
+            </div>
+            <ConnectionsGrid />
+          </div>
         </TabsContent>
 
         <TabsContent value="sources" className="mt-0">

@@ -453,9 +453,9 @@ model Conversation {
   // Relationships
   messages Message[]
 
+  @@unique([sourceName, externalId])
   // Performance indexes
   @@index([sourceName, externalId])
-  @@unique([sourceName, externalId])
   @@index([participants])
   @@map("conversations")
 }
