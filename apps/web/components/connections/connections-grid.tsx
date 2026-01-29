@@ -29,7 +29,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { ArrowUpDown, ChevronLeft, ChevronRight, Search, X } from 'lucide-react';
+import { ArrowUpDown, ChevronLeft, ChevronRight, Search, X, GitBranch } from 'lucide-react';
 
 interface Connection {
   id: string;
@@ -55,7 +55,21 @@ interface ConnectionsResponse {
   };
 }
 
-export function ConnectionsGrid() {
+interface Person {
+  id: string;
+  names: string[];
+  emails: string[];
+  title?: string;
+  organization?: {
+    name: string;
+  };
+}
+
+interface ConnectionsGridProps {
+  onFindPath?: (person: Person) => void;
+}
+
+export function ConnectionsGrid({ onFindPath }: ConnectionsGridProps) {
   const [data, setData] = useState<Connection[]>([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({
@@ -208,6 +222,33 @@ export function ConnectionsGrid() {
       ),
       cell: ({ row }) => (
         <div className="text-center text-sm">{row.original.interactionCount}</div>
+      ),
+    },
+    {
+      id: 'actions',
+      header: () => <div className="text-center">Actions</div>,
+      cell: ({ row }) => (
+        <div className="text-center">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              if (onFindPath) {
+                const person: Person = {
+                  id: row.original.id,
+                  names: row.original.names,
+                  emails: row.original.emails,
+                  title: row.original.title || undefined,
+                  organization: row.original.company ? { name: row.original.company } : undefined,
+                };
+                onFindPath(person);
+              }
+            }}
+          >
+            <GitBranch className="h-4 w-4 mr-1" />
+            Find Path
+          </Button>
+        </div>
       ),
     },
   ];

@@ -126,6 +126,7 @@ export default function IntroFinderPage() {
   const [selectedPath, setSelectedPath] = useState<Path | null>(null);
   const [sources, setSources] = useState<DataSource[]>(DATA_SOURCES);
   const [linkedInDialogOpen, setLinkedInDialogOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('finder');
 
   // Fetch current user's person record
   const { data: currentUser } = useQuery<Person>({
@@ -281,6 +282,13 @@ export default function IntroFinderPage() {
   const connectedSources = sources.filter((s) => s.status !== 'not_connected');
   const errorSources = sources.filter((s) => s.status === 'error');
 
+  // Handle finding path to a person from connections grid
+  const handleFindPath = (person: Person) => {
+    setTargetPerson(person);
+    setSelectedPath(null);
+    setActiveTab('finder');
+  };
+
   const introFinderContent = (
     <ThreePanelLayout
       leftPanel={
@@ -429,7 +437,7 @@ export default function IntroFinderPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="finder" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="mb-4">
           <TabsTrigger value="finder">Intro Finder</TabsTrigger>
           <TabsTrigger value="network">My Network</TabsTrigger>
@@ -454,7 +462,7 @@ export default function IntroFinderPage() {
                 Browse and filter all connections in your network
               </p>
             </div>
-            <ConnectionsGrid />
+            <ConnectionsGrid onFindPath={handleFindPath} />
           </div>
         </TabsContent>
 

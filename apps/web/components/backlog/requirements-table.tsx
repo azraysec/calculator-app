@@ -374,6 +374,17 @@ const REQUIREMENTS: Requirement[] = [
     dateStarted: '2026-01-30',
     dateCompleted: '2026-01-30',
   },
+  {
+    id: 'REQ-030',
+    requirement: 'Click-to-graph from connections browser',
+    priority: 'High',
+    status: 'Done',
+    category: 'Feature',
+    notes: 'Added "Find Path" button to each row in connections grid. Clicking opens Intro Finder tab with that person as target, showing graph visualization with all paths and relationship strength. Seamless integration between browsing contacts and finding intro paths. Controlled tabs with programmatic switching.',
+    dateAdded: '2026-01-30',
+    dateStarted: '2026-01-30',
+    dateCompleted: '2026-01-30',
+  },
 ];
 
 type SortField = keyof Requirement;
