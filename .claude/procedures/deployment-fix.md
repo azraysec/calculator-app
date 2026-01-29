@@ -42,8 +42,29 @@
 - [ ] No missing dependencies
 - [ ] Config files correct
 
-### 6. Deploy
-- Commit: "Fix: deployment issue - [brief description]"
+### 6. Version & Changelog (TaskCreate: "Update version and changelog")
+- Bump patch version in `apps/web/package.json` (0.7.0 → 0.7.1)
+- Add entry to `apps/web/components/backlog/requirements-table.tsx`:
+  ```typescript
+  {
+    id: 'BUG-XXX',
+    requirement: '[Brief description of deployment fix]',
+    priority: 'Critical',
+    status: 'Done',
+    category: 'Bug Fix',
+    notes: '[Details of what was blocking deployment]',
+    dateAdded: 'YYYY-MM-DD',
+    dateStarted: 'YYYY-MM-DD',
+    dateCompleted: 'YYYY-MM-DD',
+  }
+  ```
+- Update `.claude/requirements.yaml`:
+  - Set status to COMPLETED
+  - Set deployed_version to new version
+  - Update metadata.current_version
+
+### 7. Deploy
+- Commit: "Fix: deployment issue - [brief description] - v[version]"
 - Push to master
 - Monitor Vercel deployment
 - Verify build succeeds

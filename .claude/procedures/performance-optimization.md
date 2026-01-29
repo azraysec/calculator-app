@@ -50,8 +50,29 @@
 - [ ] Tests still pass
 - [ ] No new issues introduced
 
-### 7. Deploy
-- Commit with performance metrics
+### 7. Version & Changelog (TaskCreate: "Update version and changelog")
+- Bump patch version in `apps/web/package.json` (0.7.0 → 0.7.1)
+- Add entry to `apps/web/components/backlog/requirements-table.tsx`:
+  ```typescript
+  {
+    id: 'TASK-XXX',
+    requirement: '[Brief description of optimization]',
+    priority: 'Medium' | 'High',
+    status: 'Done',
+    category: 'Enhancement',
+    notes: '[Performance improvements achieved with metrics]',
+    dateAdded: 'YYYY-MM-DD',
+    dateStarted: 'YYYY-MM-DD',
+    dateCompleted: 'YYYY-MM-DD',
+  }
+  ```
+- Update `.claude/requirements.yaml`:
+  - Set status to COMPLETED
+  - Set deployed_version to new version
+  - Update metadata.current_version
+
+### 8. Deploy
+- Commit with performance metrics and version number
 - Push to master
 - Monitor production performance
 - Verify improvements live

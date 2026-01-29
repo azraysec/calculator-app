@@ -47,9 +47,29 @@
 - [ ] Bug is actually fixed
 - [ ] No new bugs introduced
 
-### 7. Deploy
-- Bump patch version (0.7.0 → 0.7.1)
-- Commit: "Fix: [brief description]"
+### 7. Version & Changelog (TaskCreate: "Update version and changelog")
+- Bump patch version in `apps/web/package.json` (0.7.0 → 0.7.1)
+- Add entry to `apps/web/components/backlog/requirements-table.tsx`:
+  ```typescript
+  {
+    id: 'BUG-XXX',
+    requirement: '[Brief description of bug fix]',
+    priority: 'Critical' | 'High' | 'Medium',
+    status: 'Done',
+    category: 'Bug Fix',
+    notes: '[Detailed explanation of fix]',
+    dateAdded: 'YYYY-MM-DD',
+    dateStarted: 'YYYY-MM-DD',
+    dateCompleted: 'YYYY-MM-DD',
+  }
+  ```
+- Update `.claude/requirements.yaml`:
+  - Set status to COMPLETED
+  - Set deployed_version to new version
+  - Update metadata.current_version
+
+### 8. Deploy
+- Commit: "Fix: [brief description] - v[version]"
 - Push to master
 - Verify deployment succeeds
 - Test fix in production

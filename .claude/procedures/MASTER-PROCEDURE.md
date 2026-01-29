@@ -29,11 +29,31 @@
 3. Verify no TypeScript errors
 4. Check deployment readiness
 
-## Phase 4: Deploy & Report
-1. Commit with clear message
+## Phase 4: Version & Changelog Management (MANDATORY)
+1. **Bump Version** (in `apps/web/package.json`):
+   - BUG_FIX → Patch (0.7.0 → 0.7.1)
+   - NEW_FEATURE/ENHANCEMENT → Minor (0.7.0 → 0.8.0)
+   - BREAKING_CHANGE → Major (0.7.0 → 1.0.0)
+
+2. **Update Changelog** (in `apps/web/components/backlog/requirements-table.tsx`):
+   - Add new entry to REQUIREMENTS array
+   - Set appropriate ID (REQ-XXX, TASK-XXX, BUG-XXX)
+   - Set priority: Critical, High, Medium, Low
+   - Set status: Done (if completed)
+   - Set category: Feature, Enhancement, Bug Fix, Infrastructure, Quality
+   - Include clear notes describing what was done
+   - Add dateAdded, dateStarted, dateCompleted
+
+3. **Update Requirements Tracker** (`.claude/requirements.yaml`):
+   - Update metadata.last_updated
+   - Update metadata.current_version
+   - Mark requirement as COMPLETED with deployed_version
+
+## Phase 5: Deploy & Report
+1. Commit with clear message including version number
 2. Push to master (triggers auto-deploy)
 3. Report to user:
-   - Version number
+   - Version number (what was deployed)
    - What was done
    - What's now live
    - Any follow-up needed

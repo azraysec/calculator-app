@@ -346,7 +346,7 @@ export class LinkedInArchiveParser {
           }
 
           // Upsert conversation record
-          const conversation = await this.prisma.conversation.upsert({
+          await this.prisma.conversation.upsert({
             where: {
               sourceName_externalId: {
                 sourceName: 'linkedin',

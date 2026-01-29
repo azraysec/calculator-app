@@ -3,8 +3,8 @@
 # User adds new requirements, Steve updates status
 
 metadata:
-  last_updated: 2026-01-29
-  current_version: "0.7.0"
+  last_updated: 2026-01-30
+  current_version: "0.7.1"
   next_version: "0.8.0"
 
 requirements:
@@ -308,6 +308,71 @@ requirements:
     deployed: true
     deployed_version: "0.7.0"
     verification: "Requirements tracker created with all completed work documented"
+
+  - id: REQ-009
+    title: "Add version management and changelog updates to all procedures"
+    status: COMPLETED
+    priority: HIGH
+    created: 2026-01-30
+    planning:
+      completed: true
+      date: 2026-01-30
+      notes: "Steve needs to automatically manage version numbers and update changelog on every deployment"
+    design:
+      completed: true
+      date: 2026-01-30
+      approach: |
+        1. Add version bump steps to all procedures (patch for bug fixes, minor for features, major for breaking)
+        2. Add changelog entry creation to all procedures
+        3. Update MASTER-PROCEDURE to always include version+changelog steps
+        4. Set up GitHub Issues as requirement tracker
+      architect_approved: true
+    spec:
+      completed: true
+      date: 2026-01-30
+      details: |
+        Version Bumping Rules:
+        - BUG_FIX: Bump patch version (0.7.0 → 0.7.1)
+        - NEW_FEATURE/ENHANCEMENT: Bump minor version (0.7.0 → 0.8.0)
+        - BREAKING_CHANGE: Bump major version (0.7.0 → 1.0.0)
+
+        Changelog Updates:
+        - Add entry to RequirementsTable REQUIREMENTS array
+        - Include: id, requirement, priority, status, category, notes, dates
+        - Category: Feature, Enhancement, Bug Fix, Infrastructure, Quality
+        - Update status throughout lifecycle: Planned → In Progress → Done
+
+        GitHub Issues Integration:
+        - Check issues first on every request
+        - Priority labels (P0-Critical through P3-Low)
+        - Status labels (in-progress, blocked)
+        - Close issues with version number in comment
+    implementation:
+      status: COMPLETED
+      date: 2026-01-30
+      version: "0.7.1"
+      files:
+        - ".claude/procedures/MASTER-PROCEDURE.md"
+        - ".claude/procedures/bug-fix.md"
+        - ".claude/procedures/new-feature.md"
+        - ".claude/procedures/database-migration.md"
+        - ".claude/procedures/deployment-fix.md"
+        - ".claude/procedures/performance-optimization.md"
+        - ".claude/procedures/investigation.md"
+        - ".claude/procedures/github-issues-management.md"
+        - ".claude/steve-ceo-workflow.md"
+        - ".claude/requirements.yaml"
+        - "apps/web/package.json"
+        - "packages/adapters/src/linkedin/archive-parser.ts"
+      tests_added: 0
+      tests_passing: true
+    bugs:
+      - description: "Unused 'conversation' variable in archive-parser.ts"
+        fixed: true
+        fixed_in: "0.7.1"
+    deployed: true
+    deployed_version: "0.7.1"
+    verification: "All procedures include version bump and changelog update steps. GitHub Issues set up as primary tracker. Steve's workflow updated to report version numbers."
 
 # Template for new requirements (copy and modify as needed)
 # - id: REQ-XXX

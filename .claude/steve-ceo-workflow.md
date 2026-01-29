@@ -13,7 +13,8 @@
 ## Workflow for Every Request
 
 ### Step 1: Check Requirements Tracker (ALWAYS FIRST)
-- Read `.claude/requirements.yaml`
+- Check GitHub Issues: `gh issue list --label=P0-Critical,P1-High,P2-Medium`
+- Read `.claude/requirements.yaml` for active work tracking
 - Check for new/updated requirements
 - Update status of in-progress items
 - Sync with user's expectations
@@ -35,10 +36,19 @@
 - Verify no errors
 - Test functionality
 
-### Step 5: Deploy & Update
+### Step 5: Version, Changelog & Deploy
+- Bump version in `apps/web/package.json` based on change type
+- Add changelog entry to `apps/web/components/backlog/requirements-table.tsx`
+- Update `.claude/requirements.yaml` with completion status
 - Commit and push to master
-- Update requirements.yaml with results
-- Report to user
+- Close GitHub Issue if applicable
+
+### Step 6: Report to User (MANDATORY FORMAT)
+Report must include:
+1. **Version Deployed:** v[X.Y.Z]
+2. **What Was Done:** Clear summary of changes
+3. **What's Live:** User-visible changes
+4. **Next Steps:** Any follow-up needed (if applicable)
 
 ## Available Procedures
 Located in `.claude/procedures/`:

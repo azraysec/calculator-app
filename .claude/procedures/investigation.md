@@ -50,6 +50,24 @@
 - Recommendations
 - Proposed solutions if applicable
 
+### 7. Update Tracking (if investigation led to code changes)
+If any code/documentation was created or modified:
+- Add entry to `apps/web/components/backlog/requirements-table.tsx`:
+  ```typescript
+  {
+    id: 'TASK-XXX',
+    requirement: '[Investigation topic]',
+    priority: 'Medium',
+    status: 'Done',
+    category: 'Investigation',
+    notes: '[Key findings and recommendations]',
+    dateAdded: 'YYYY-MM-DD',
+    dateStarted: 'YYYY-MM-DD',
+    dateCompleted: 'YYYY-MM-DD',
+  }
+  ```
+- Update `.claude/requirements.yaml` if tracking
+
 ## Quality Checks
 - [ ] All questions answered
 - [ ] Findings documented

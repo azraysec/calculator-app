@@ -63,7 +63,7 @@
 - **Agent:** `documentation-engineer`
 - Update README if needed
 - Add API documentation
-- Update changelog
+- Document any new environment variables
 
 ### 9. Quality Gate
 - [ ] `pnpm run build` passes
@@ -72,9 +72,29 @@
 - [ ] No TypeScript errors
 - [ ] User acceptance criteria met
 
-### 10. Deploy
-- Bump minor version (0.7.0 → 0.8.0)
-- Commit: "Add: [feature name]"
+### 10. Version & Changelog (TaskCreate: "Update version and changelog")
+- Bump minor version in `apps/web/package.json` (0.7.0 → 0.8.0)
+- Add entry to `apps/web/components/backlog/requirements-table.tsx`:
+  ```typescript
+  {
+    id: 'REQ-XXX',
+    requirement: '[Brief description of feature]',
+    priority: 'Critical' | 'High' | 'Medium' | 'Low',
+    status: 'Done',
+    category: 'Feature',
+    notes: '[Detailed explanation of what was built]',
+    dateAdded: 'YYYY-MM-DD',
+    dateStarted: 'YYYY-MM-DD',
+    dateCompleted: 'YYYY-MM-DD',
+  }
+  ```
+- Update `.claude/requirements.yaml`:
+  - Set status to COMPLETED
+  - Set deployed_version to new version
+  - Update metadata.current_version
+
+### 11. Deploy
+- Commit: "Add: [feature name] - v[version]"
 - Push to master
 - Verify deployment succeeds
 - Test feature in production

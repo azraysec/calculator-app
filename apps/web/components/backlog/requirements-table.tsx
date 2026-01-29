@@ -264,6 +264,17 @@ const REQUIREMENTS: Requirement[] = [
     dateStarted: '2026-01-24 20:52:00',
     dateCompleted: '2026-01-24 20:58:00',
   },
+  {
+    id: 'TASK-023',
+    requirement: 'Add version management and changelog updates to all procedures',
+    priority: 'High',
+    status: 'Done',
+    category: 'Enhancement',
+    notes: 'Steve now automatically bumps version (patch/minor/major based on change type), adds changelog entries, and reports version number in all completion messages. Set up GitHub Issues as primary requirement tracker with priority labels (P0-Critical through P3-Low). Created github-issues-management.md procedure.',
+    dateAdded: '2026-01-30',
+    dateStarted: '2026-01-30',
+    dateCompleted: '2026-01-30',
+  },
 ];
 
 type SortField = keyof Requirement;
