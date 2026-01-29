@@ -470,7 +470,8 @@ export class LinkedInArchiveParser {
   }
 
   /**
-   * Upsert person record
+   * Upsert person record with deduplication
+   * Searches by email first, then by exact name match to prevent duplicates
    */
   private async upsertPerson(data: {
     names: string[];
@@ -492,7 +493,32 @@ export class LinkedInArchiveParser {
       }
     }
 
-    // Create new person
+    // If no email or not found by email, try to find by exact name match
+    // This prevents duplicate persons on re-upload when they don't have emails
+    if (data.names.length > 0) {
+      const existing = await this.prisma.person.findFirst({
+        where: {
+          names: { hasSome: data.names },
+          deletedAt: null,
+        },
+      });
+
+      if (existing) {
+        // Found existing person by name - update their email if we have one now
+        if (data.emails.length > 0) {
+          const updatedPerson = await this.prisma.person.update({
+            where: { id: existing.id },
+            data: {
+              emails: Array.from(new Set([...existing.emails, ...data.emails])),
+            },
+          });
+          return { person: updatedPerson, wasCreated: false };
+        }
+        return { person: existing, wasCreated: false };
+      }
+    }
+
+    // Create new person only if not found by email or name
     const person = await this.prisma.person.create({
       data: {
         names: data.names,
@@ -557,13 +583,21 @@ export class LinkedInArchiveParser {
   }
 
   /**
-   * Find file in ZIP entries (case-insensitive)
+   * Find file in ZIP entries (case-insensitive, exact filename match)
+   * Matches exact filename or path ending with /filename
    */
   private findFile(entries: AdmZip.IZipEntry[], fileName: string): AdmZip.IZipEntry | null {
+    const lowerFileName = fileName.toLowerCase();
     return (
-      entries.find(
-        (entry) => entry.entryName.toLowerCase().endsWith(fileName.toLowerCase())
-      ) || null
+      entries.find((entry) => {
+        const lowerEntryName = entry.entryName.toLowerCase();
+        // Match exact filename or path ending with /filename
+        return (
+          lowerEntryName === lowerFileName ||
+          lowerEntryName.endsWith('/' + lowerFileName) ||
+          lowerEntryName.endsWith('\\' + lowerFileName)
+        );
+      }) || null
     );
   }
 

@@ -20,6 +20,7 @@ describe('LinkedInArchiveParser', () => {
       person: {
         findFirst: vi.fn(),
         create: vi.fn(),
+        update: vi.fn(),
       },
       edge: {
         findFirst: vi.fn(),
@@ -66,6 +67,18 @@ describe('LinkedInArchiveParser', () => {
       const result = (parser as any).findFile(entries, 'connections.csv');
       expect(result).toBeDefined();
       expect(result.entryName).toBe('data/Connections.csv');
+    });
+
+    it('should NOT match files that end with search term but are not exact', () => {
+      const entries = [
+        { entryName: 'guide_messages.csv' },
+        { entryName: 'messages.csv' },
+        { entryName: 'learning_coach_messages.csv' },
+      ] as any[];
+
+      const result = (parser as any).findFile(entries, 'messages.csv');
+      expect(result).toBeDefined();
+      expect(result.entryName).toBe('messages.csv'); // Should match exact file, not guide_messages.csv
     });
   });
 
@@ -119,19 +132,52 @@ describe('LinkedInArchiveParser', () => {
       });
     });
 
-    it('should skip email lookup if no emails provided', async () => {
-      mockPrisma.person.create.mockResolvedValue({
+    it('should find existing person by name when no email provided', async () => {
+      const existingPerson = {
         id: 'person-3',
-        names: ['No Email'],
-      });
+        names: ['John Doe'],
+        emails: [],
+      };
+
+      mockPrisma.person.findFirst.mockResolvedValue(existingPerson);
 
       const result = await (parser as any).upsertPerson({
-        names: ['No Email'],
+        names: ['John Doe'],
         emails: [],
       });
 
-      expect(mockPrisma.person.findFirst).not.toHaveBeenCalled();
-      expect(result.wasCreated).toBe(true);
+      expect(result.person).toEqual(existingPerson);
+      expect(result.wasCreated).toBe(false);
+    });
+
+    it('should update existing person with email when found by name', async () => {
+      const existingPerson = {
+        id: 'person-4',
+        names: ['Jane Smith'],
+        emails: [],
+      };
+
+      mockPrisma.person.findFirst
+        .mockResolvedValueOnce(null) // Email search returns null
+        .mockResolvedValueOnce(existingPerson); // Name search finds person
+
+      mockPrisma.person.update.mockResolvedValue({
+        ...existingPerson,
+        emails: ['jane@example.com'],
+      });
+
+      const result = await (parser as any).upsertPerson({
+        names: ['Jane Smith'],
+        emails: ['jane@example.com'],
+      });
+
+      expect(mockPrisma.person.update).toHaveBeenCalledWith({
+        where: { id: 'person-4' },
+        data: {
+          emails: ['jane@example.com'],
+        },
+      });
+      expect(result.wasCreated).toBe(false);
     });
   });
 
