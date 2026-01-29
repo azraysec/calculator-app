@@ -96,23 +96,94 @@ async function main() {
   }
 
   console.log(`\n3. Will delete ${personsToDelete.length} duplicate persons`);
-  console.log('   Updating references to point to kept persons...');
+  console.log('   First, merging and cleaning up edges...');
 
-  // 3. Update all edges that reference deleted persons
+  // 3a. Get all edges that reference persons to be deleted
+  const affectedEdges = await prisma.edge.findMany({
+    where: {
+      OR: [
+        { fromPersonId: { in: personsToDelete } },
+        { toPersonId: { in: personsToDelete } },
+      ],
+    },
+  });
+
+  console.log(`   Found ${affectedEdges.length} edges to remap`);
+
+  // 3b. Group edges by their new (remapped) from/to pair
+  const remappedEdgeGroups = new Map<string, typeof affectedEdges>();
+
+  affectedEdges.forEach((edge) => {
+    const newFromId = personsToKeep.get(edge.fromPersonId) || edge.fromPersonId;
+    const newToId = personsToKeep.get(edge.toPersonId) || edge.toPersonId;
+    const key = `${newFromId}-${newToId}`;
+
+    if (!remappedEdgeGroups.has(key)) {
+      remappedEdgeGroups.set(key, []);
+    }
+    remappedEdgeGroups.get(key)!.push(edge);
+  });
+
+  // 3c. For each group, keep one edge and delete others
+  let edgesDeleted = 0;
+  for (const [key, edges] of remappedEdgeGroups.entries()) {
+    if (edges.length === 1) {
+      // Single edge - just update its references
+      const edge = edges[0];
+      const newFromId = personsToKeep.get(edge.fromPersonId) || edge.fromPersonId;
+      const newToId = personsToKeep.get(edge.toPersonId) || edge.toPersonId;
+
+      await prisma.edge.update({
+        where: { id: edge.id },
+        data: {
+          fromPersonId: newFromId,
+          toPersonId: newToId,
+        },
+      });
+    } else {
+      // Multiple edges will map to same from/to - merge them
+      const keepEdge = edges[0];
+      const deleteEdges = edges.slice(1);
+
+      // Sum interaction counts
+      const totalInteractions = edges.reduce(
+        (sum, e) => sum + e.interactionCount,
+        0
+      );
+
+      // Merge sources
+      const allSources = Array.from(
+        new Set(edges.flatMap((e) => e.sources))
+      );
+
+      // Update the kept edge
+      const newFromId = personsToKeep.get(keepEdge.fromPersonId) || keepEdge.fromPersonId;
+      const newToId = personsToKeep.get(keepEdge.toPersonId) || keepEdge.toPersonId;
+
+      await prisma.edge.update({
+        where: { id: keepEdge.id },
+        data: {
+          fromPersonId: newFromId,
+          toPersonId: newToId,
+          interactionCount: totalInteractions,
+          sources: allSources,
+        },
+      });
+
+      // Delete duplicate edges
+      await prisma.edge.deleteMany({
+        where: { id: { in: deleteEdges.map((e) => e.id) } },
+      });
+
+      edgesDeleted += deleteEdges.length;
+    }
+  }
+
+  console.log(`   ✓ Merged and deleted ${edgesDeleted} duplicate edges`);
+
+  // 3d. Update evidence events
+  console.log('   Updating evidence events...');
   for (const [oldId, keepId] of personsToKeep.entries()) {
-    // Update edges where deleted person is fromPerson
-    await prisma.edge.updateMany({
-      where: { fromPersonId: oldId },
-      data: { fromPersonId: keepId },
-    });
-
-    // Update edges where deleted person is toPerson
-    await prisma.edge.updateMany({
-      where: { toPersonId: oldId },
-      data: { toPersonId: keepId },
-    });
-
-    // Update evidence events
     await prisma.evidenceEvent.updateMany({
       where: { subjectPersonId: oldId },
       data: { subjectPersonId: keepId },
@@ -134,23 +205,24 @@ async function main() {
 
   console.log(`   ✓ Deleted ${deleted.count} duplicate persons`);
 
-  // 5. Remove duplicate edges (same from/to pair)
-  console.log('\n4. Cleaning up duplicate edges...');
+  // 5. Final check for any remaining duplicate edges
+  console.log('\n4. Final duplicate edge check...');
 
-  // Find duplicate edges
-  const edges = await prisma.edge.findMany({
+  // Find any remaining duplicate edges
+  const remainingEdges = await prisma.edge.findMany({
     select: {
       id: true,
       fromPersonId: true,
       toPersonId: true,
       createdAt: true,
       interactionCount: true,
+      sources: true,
     },
     orderBy: { createdAt: 'asc' },
   });
 
-  const edgeMap = new Map<string, typeof edges>();
-  edges.forEach((edge) => {
+  const edgeMap = new Map<string, typeof remainingEdges>();
+  remainingEdges.forEach((edge) => {
     const key = `${edge.fromPersonId}-${edge.toPersonId}`;
     if (!edgeMap.has(key)) {
       edgeMap.set(key, []);
@@ -162,35 +234,45 @@ async function main() {
     ([_, edges]) => edges.length > 1
   );
 
-  console.log(`   Found ${duplicateEdges.length} duplicate edge groups`);
+  if (duplicateEdges.length > 0) {
+    console.log(`   Found ${duplicateEdges.length} remaining duplicate edge groups, merging...`);
 
-  let edgesToDelete: string[] = [];
-  for (const [key, edgeList] of duplicateEdges) {
-    const keep = edgeList[0]; // Keep oldest
-    const duplicates = edgeList.slice(1);
+    let edgesToDelete: string[] = [];
+    for (const [key, edgeList] of duplicateEdges) {
+      const keep = edgeList[0]; // Keep oldest
+      const duplicates = edgeList.slice(1);
 
-    // Sum up interaction counts
-    const totalInteractions = edgeList.reduce(
-      (sum, e) => sum + e.interactionCount,
-      0
-    );
+      // Sum up interaction counts
+      const totalInteractions = edgeList.reduce(
+        (sum, e) => sum + e.interactionCount,
+        0
+      );
 
-    // Update the kept edge with total interactions
-    await prisma.edge.update({
-      where: { id: keep.id },
-      data: { interactionCount: totalInteractions },
-    });
+      // Merge sources
+      const allSources = Array.from(
+        new Set(edgeList.flatMap((e) => e.sources))
+      );
 
-    duplicates.forEach((dup) => edgesToDelete.push(dup.id));
-  }
+      // Update the kept edge with merged data
+      await prisma.edge.update({
+        where: { id: keep.id },
+        data: {
+          interactionCount: totalInteractions,
+          sources: allSources,
+        },
+      });
 
-  if (edgesToDelete.length > 0) {
-    const deletedEdges = await prisma.edge.deleteMany({
-      where: { id: { in: edgesToDelete } },
-    });
-    console.log(`   ✓ Deleted ${deletedEdges.count} duplicate edges`);
+      duplicates.forEach((dup) => edgesToDelete.push(dup.id));
+    }
+
+    if (edgesToDelete.length > 0) {
+      const deletedEdges = await prisma.edge.deleteMany({
+        where: { id: { in: edgesToDelete } },
+      });
+      console.log(`   ✓ Deleted ${deletedEdges.count} duplicate edges`);
+    }
   } else {
-    console.log('   ✓ No duplicate edges found');
+    console.log('   ✓ No remaining duplicate edges');
   }
 
   console.log('\n=== CLEANUP COMPLETE ===');
