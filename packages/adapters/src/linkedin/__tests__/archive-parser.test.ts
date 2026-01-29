@@ -298,6 +298,8 @@ John,Doe,john@example.com,ACME Corp,Engineer,12 Jan 2026`;
       const result = await (parser as any).parseConnections(csvContent);
 
       expect(result.count).toBe(1);
+      expect(result.newPersons).toBeGreaterThanOrEqual(0);
+      expect(result.edgesRescored).toBeGreaterThanOrEqual(0);
       expect(result.errors).toHaveLength(0);
     });
 
@@ -308,6 +310,8 @@ Jane,Smith,jane@example.com,Tech Inc,Manager,15 Feb 2026`;
       const result = await (parser as any).parseConnections(csvContent);
 
       expect(result.count).toBe(1);
+      expect(result.newPersons).toBeGreaterThanOrEqual(0);
+      expect(result.edgesRescored).toBeGreaterThanOrEqual(0);
       expect(result.errors).toHaveLength(0);
     });
 
@@ -425,6 +429,8 @@ conv-1,John Doe,Test User,2026-01-12 10:05:00 UTC,Hi back`;
       const result = await (parser as any).parseMessages(csvContent);
 
       expect(result.count).toBe(2);
+      expect(result.newPersons).toBeGreaterThanOrEqual(0);
+      expect(result.edgesRescored).toBeGreaterThanOrEqual(0);
       expect(result.errors).toHaveLength(0);
     });
 

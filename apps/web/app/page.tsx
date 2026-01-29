@@ -19,6 +19,7 @@ import { EvidenceViewer } from '@/components/evidence/evidence-viewer';
 import { SourceCard } from '@/components/data-sources/source-card';
 import { SyncHealthWidget } from '@/components/data-sources/sync-health-widget';
 import { LinkedInUploadDialog } from '@/components/data-sources/linkedin-upload-dialog';
+import { LinkedInUploadHistory } from '@/components/data-sources/linkedin-upload-history';
 import { Card } from '@/components/ui/card';
 
 interface Person {
@@ -454,22 +455,11 @@ export default function IntroFinderPage() {
               ))}
             </div>
 
-            {/* Recent Sync Runs */}
-            <Card className="p-6">
-              <h2 className="text-xl font-semibold mb-4">Recent Sync Runs</h2>
-              <div className="space-y-3">
-                {connectedSources.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    No data sources connected yet. Connect a source above to start building
-                    your network graph.
-                  </p>
-                ) : (
-                  <div className="text-sm text-muted-foreground">
-                    Sync history will appear here after connecting data sources.
-                  </div>
-                )}
-              </div>
-            </Card>
+            {/* LinkedIn Upload History */}
+            <div>
+              <h2 className="text-xl font-semibold mb-4">LinkedIn Upload History</h2>
+              <LinkedInUploadHistory />
+            </div>
 
             {/* LinkedIn Upload Dialog */}
             <LinkedInUploadDialog

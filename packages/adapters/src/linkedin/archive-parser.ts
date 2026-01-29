@@ -16,9 +16,13 @@ export interface ParserProgress {
 
 export interface ParserResult {
   connectionsProcessed: number;
+  newConnectionsAdded: number;
+  existingConnectionsUpdated: number;
   messagesProcessed: number;
+  newMessagesAdded: number;
   evidenceEventsCreated: number;
   newPersonsAdded: number;
+  edgesRescored: number;
   errors: string[];
 }
 
@@ -43,9 +47,13 @@ export class LinkedInArchiveParser {
   async parseArchive(filePath: string): Promise<ParserResult> {
     const result: ParserResult = {
       connectionsProcessed: 0,
+      newConnectionsAdded: 0,
+      existingConnectionsUpdated: 0,
       messagesProcessed: 0,
+      newMessagesAdded: 0,
       evidenceEventsCreated: 0,
       newPersonsAdded: 0,
+      edgesRescored: 0,
       errors: [],
     };
 
@@ -73,8 +81,11 @@ export class LinkedInArchiveParser {
           zip.readAsText(connectionsFile)
         );
         result.connectionsProcessed = connectionsResult.count;
+        result.newConnectionsAdded = connectionsResult.newPersons;
+        result.existingConnectionsUpdated = connectionsResult.count - connectionsResult.newPersons;
         result.newPersonsAdded += connectionsResult.newPersons;
         result.evidenceEventsCreated += connectionsResult.evidenceEvents;
+        result.edgesRescored += connectionsResult.edgesRescored;
         result.errors.push(...connectionsResult.errors);
       } else {
         result.errors.push('Connections.csv not found in archive');
@@ -87,7 +98,10 @@ export class LinkedInArchiveParser {
           zip.readAsText(messagesFile)
         );
         result.messagesProcessed = messagesResult.count;
+        result.newMessagesAdded = messagesResult.count; // All messages are new evidence events
+        result.newPersonsAdded += messagesResult.newPersons;
         result.evidenceEventsCreated += messagesResult.evidenceEvents;
+        result.edgesRescored += messagesResult.edgesRescored;
         result.errors.push(...messagesResult.errors);
       } else {
         result.errors.push('messages.csv not found in archive');
@@ -110,12 +124,14 @@ export class LinkedInArchiveParser {
     count: number;
     newPersons: number;
     evidenceEvents: number;
+    edgesRescored: number;
     errors: string[];
   }> {
     const result = {
       count: 0,
       newPersons: 0,
       evidenceEvents: 0,
+      edgesRescored: 0,
       errors: [] as string[],
     };
 
@@ -209,6 +225,7 @@ export class LinkedInArchiveParser {
             sources: ['linkedin_archive'],
             firstSeenAt: connectedOn ? this.parseDate(connectedOn) : new Date(),
           });
+          result.edgesRescored++;
 
           // Create evidence event
           await this.prisma.evidenceEvent.create({
@@ -248,12 +265,16 @@ export class LinkedInArchiveParser {
    */
   private async parseMessages(csvContent: string): Promise<{
     count: number;
+    newPersons: number;
     evidenceEvents: number;
+    edgesRescored: number;
     errors: string[];
   }> {
     const result = {
       count: 0,
+      newPersons: 0,
       evidenceEvents: 0,
+      edgesRescored: 0,
       errors: [] as string[],
     };
 
@@ -396,6 +417,7 @@ export class LinkedInArchiveParser {
                   },
                 },
               });
+              result.newPersons++;
             }
 
             // Create or update edge between me and other person
@@ -408,6 +430,7 @@ export class LinkedInArchiveParser {
                 firstSeenAt: date ? this.parseDate(date) : new Date(),
               }
             );
+            result.edgesRescored++;
 
             // Create evidence event
             await this.prisma.evidenceEvent.create({
