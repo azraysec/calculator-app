@@ -437,13 +437,27 @@ function getStatusColor(status: Requirement['status']) {
   }
 }
 
+interface GitHubIssue {
+  number: number;
+  title: string;
+  state: 'open' | 'closed';
+  labels: string[];
+  priority: 'Critical' | 'High' | 'Medium' | 'Low' | null;
+  status: 'Open' | 'In Progress' | 'Closed';
+  createdAt: string;
+  updatedAt: string;
+  assignee: string | null;
+  url: string;
+}
+
 export function RequirementsTable() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState<SortField>('id');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [viewFilter, setViewFilter] = useState<'all' | 'open' | 'completed'>('all');
 
   // Fetch changelog from API with real-time polling (every 5 seconds)
-  const { data: changelogData, isLoading, error } = useQuery<{ entries: Requirement[] }>({
+  const { data: changelogData, isLoading: isLoadingChangelog, error: changelogError } = useQuery<{ entries: Requirement[] }>({
     queryKey: ['changelog'],
     queryFn: async () => {
       const res = await fetch('/api/changelog');
@@ -456,7 +470,63 @@ export function RequirementsTable() {
     refetchIntervalInBackground: true,
   });
 
-  const REQUIREMENTS = changelogData?.entries || STATIC_REQUIREMENTS;
+  // Fetch GitHub issues with real-time polling
+  const { data: issuesData, isLoading: isLoadingIssues, error: issuesError } = useQuery<{ issues: GitHubIssue[] }>({
+    queryKey: ['github-issues'],
+    queryFn: async () => {
+      const res = await fetch('/api/github/issues?state=all');
+      if (!res.ok) {
+        // Don't throw error - just return empty array if GitHub fetch fails
+        console.warn('Failed to fetch GitHub issues');
+        return { issues: [] };
+      }
+      return res.json();
+    },
+    refetchInterval: 10000, // Poll every 10 seconds (less frequent than changelog)
+    refetchIntervalInBackground: true,
+  });
+
+  // Merge changelog entries and GitHub issues
+  const REQUIREMENTS = useMemo(() => {
+    const changelog = changelogData?.entries || STATIC_REQUIREMENTS;
+    const issues = issuesData?.issues || [];
+
+    // Convert GitHub issues to Requirement format
+    const issueRequirements: Requirement[] = issues.map((issue) => ({
+      id: `#${issue.number}`,
+      requirement: issue.title,
+      priority: issue.priority || 'Medium',
+      status: issue.status,
+      category: issue.labels.find((l) => ['bug', 'enhancement', 'feature'].includes(l))
+        ? issue.labels.find((l) => ['bug', 'enhancement', 'feature'].includes(l))!
+        : 'Feature',
+      notes: `GitHub Issue #${issue.number} - ${issue.labels.join(', ')}`,
+      dateAdded: new Date(issue.createdAt).toISOString().split('T')[0],
+      dateStarted: issue.status === 'In Progress' ? new Date(issue.updatedAt).toISOString().split('T')[0] : undefined,
+      dateCompleted: issue.state === 'closed' ? new Date(issue.updatedAt).toISOString().split('T')[0] : undefined,
+      githubIssueNumber: issue.number,
+      githubIssueUrl: issue.url,
+    }));
+
+    // Merge and deduplicate (prefer changelog entries over GitHub issues for same number)
+    const merged = [...changelog];
+    const changelogIssueNumbers = new Set(
+      changelog
+        .filter((r) => r.githubIssueNumber)
+        .map((r) => r.githubIssueNumber)
+    );
+
+    issueRequirements.forEach((issueReq) => {
+      if (!changelogIssueNumbers.has(issueReq.githubIssueNumber)) {
+        merged.push(issueReq);
+      }
+    });
+
+    return merged;
+  }, [changelogData, issuesData]);
+
+  const isLoading = isLoadingChangelog || isLoadingIssues;
+  const error = changelogError || issuesError;
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -468,8 +538,16 @@ export function RequirementsTable() {
   };
 
   const filteredAndSortedRequirements = useMemo(() => {
+    // Filter by view (all/open/completed)
+    let filtered = REQUIREMENTS;
+    if (viewFilter === 'open') {
+      filtered = filtered.filter((req) => req.status === 'Open' || req.status === 'In Progress' || req.status === 'Planned');
+    } else if (viewFilter === 'completed') {
+      filtered = filtered.filter((req) => req.status === 'Done');
+    }
+
     // Filter by search query
-    let filtered = REQUIREMENTS.filter((req) => {
+    filtered = filtered.filter((req) => {
       const query = searchQuery.toLowerCase();
       return (
         req.id.toLowerCase().includes(query) ||
@@ -492,7 +570,7 @@ export function RequirementsTable() {
     });
 
     return filtered;
-  }, [searchQuery, sortField, sortDirection]);
+  }, [REQUIREMENTS, searchQuery, sortField, sortDirection, viewFilter]);
 
   const SortIcon = ({ field }: { field: SortField }) => {
     if (sortField !== field) return <ArrowUpDown className="w-3 h-3 inline ml-1 opacity-50" />;
@@ -510,13 +588,47 @@ export function RequirementsTable() {
           <h2 className="text-2xl font-bold">Development Changelog</h2>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             {isLoading && <RefreshCw className="w-4 h-4 animate-spin" />}
-            {error && <span className="text-red-500">Error loading changelog</span>}
+            {error && <span className="text-red-500">Error loading data</span>}
             <span className="text-green-500">● Live</span>
           </div>
         </div>
         <p className="text-sm text-muted-foreground mb-4">
-          Feature requests, improvements, bug fixes, and all development tasks tracked for WIG. Updates in real-time.
+          Complete view: Completed work from changelog + Open GitHub Issues. Updates in real-time (changelog: 5s, issues: 10s).
         </p>
+
+        {/* Filter Controls */}
+        <div className="flex gap-2 mb-4">
+          <button
+            onClick={() => setViewFilter('all')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              viewFilter === 'all'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+            }`}
+          >
+            All ({REQUIREMENTS.length})
+          </button>
+          <button
+            onClick={() => setViewFilter('open')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              viewFilter === 'open'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+            }`}
+          >
+            Open Issues ({REQUIREMENTS.filter((r) => r.status === 'Open' || r.status === 'In Progress' || r.status === 'Planned').length})
+          </button>
+          <button
+            onClick={() => setViewFilter('completed')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              viewFilter === 'completed'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+            }`}
+          >
+            Completed ({REQUIREMENTS.filter((r) => r.status === 'Done').length})
+          </button>
+        </div>
 
         {/* Search Box */}
         <div className="relative">

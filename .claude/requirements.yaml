@@ -4,8 +4,8 @@
 
 metadata:
   last_updated: 2026-01-30
-  current_version: "0.9.0"
-  next_version: "0.10.0"
+  current_version: "0.10.0"
+  next_version: "0.11.0"
 
 requirements:
   - id: REQ-001
@@ -417,6 +417,48 @@ requirements:
     deployed: true
     deployed_version: "0.9.0"
     verification: "Changelog now loads from database with real-time updates (5s polling). Shows live indicator. All 34 existing entries migrated. 8 unit tests passing."
+
+  - id: REQ-010
+    title: "Show all GitHub issues in changelog for complete visibility (Issue #11)"
+    status: COMPLETED
+    priority: CRITICAL
+    created: 2026-01-30
+    planning:
+      completed: true
+      date: 2026-01-30
+      notes: "Integrate GitHub Issues directly into changelog view using gh CLI"
+    design:
+      completed: true
+      date: 2026-01-30
+      approach: "Create /api/github/issues endpoint, merge with changelog entries, add filtering"
+      architect_approved: true
+    spec:
+      completed: true
+      date: 2026-01-30
+      details: |
+        1. Create /api/github/issues endpoint using gh CLI
+        2. Fetch issues with labels, priorities, status, assignees
+        3. Transform GitHub issues to Requirement format
+        4. Merge with changelog entries, deduplicating by issue number
+        5. Add filter controls: All/Open Issues/Completed
+        6. Real-time polling: changelog 5s, GitHub 10s
+        7. Show counts in filter buttons
+        8. Add comprehensive unit tests
+    implementation:
+      status: COMPLETED
+      date: 2026-01-30
+      version: "0.10.0"
+      files:
+        - "apps/web/app/api/github/issues/route.ts"
+        - "apps/web/app/api/github/issues/route.test.ts"
+        - "apps/web/components/backlog/requirements-table.tsx"
+        - "apps/web/package.json"
+      tests_added: 8
+      tests_passing: true
+    bugs: []
+    deployed: true
+    deployed_version: "0.10.0"
+    verification: "Changelog shows complete view: completed work + open GitHub issues. Filter controls working. Real-time updates every 5-10s. All 8 unit tests passing."
 
 # Template for new requirements (copy and modify as needed)
 # - id: REQ-XXX
