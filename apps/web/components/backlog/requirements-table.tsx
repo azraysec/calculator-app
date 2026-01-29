@@ -363,6 +363,17 @@ const REQUIREMENTS: Requirement[] = [
     dateStarted: '2026-01-30',
     dateCompleted: '2026-01-30',
   },
+  {
+    id: 'BUG-029',
+    requirement: 'Fix pathfinding not working after finding a contact (P0-Critical)',
+    priority: 'Critical',
+    status: 'Done',
+    category: 'Bug Fix',
+    notes: 'Root cause: currentUserId was hardcoded to "me" (not a valid UUID), causing API to fail. Created /api/me endpoint that returns current user\'s person record (identified by metadata.isMe = true). Updated frontend to fetch current user from /api/me before running pathfinding queries. Pathfinding now works correctly.',
+    dateAdded: '2026-01-30',
+    dateStarted: '2026-01-30',
+    dateCompleted: '2026-01-30',
+  },
 ];
 
 type SortField = keyof Requirement;

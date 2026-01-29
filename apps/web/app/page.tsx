@@ -127,26 +127,37 @@ export default function IntroFinderPage() {
   const [sources, setSources] = useState<DataSource[]>(DATA_SOURCES);
   const [linkedInDialogOpen, setLinkedInDialogOpen] = useState(false);
 
-  // TODO: Replace with actual user ID from auth
-  const currentUserId = 'me';
+  // Fetch current user's person record
+  const { data: currentUser } = useQuery<Person>({
+    queryKey: ['me'],
+    queryFn: async () => {
+      const res = await fetch('/api/me');
+      if (!res.ok) {
+        throw new Error('Failed to fetch current user');
+      }
+      return res.json();
+    },
+  });
 
   const {
     data: pathsResult,
-    isLoading,
+    isLoading: isLoadingPaths,
     error,
   } = useQuery<PathfindingResult>({
-    queryKey: ['paths', currentUserId, targetPerson?.id],
+    queryKey: ['paths', currentUser?.id, targetPerson?.id],
     queryFn: async () => {
       const res = await fetch(
-        `/api/people/${currentUserId}/paths?target=${targetPerson!.id}`
+        `/api/people/${currentUser!.id}/paths?target=${targetPerson!.id}`
       );
       if (!res.ok) {
         throw new Error('Failed to find paths');
       }
       return res.json();
     },
-    enabled: !!targetPerson,
+    enabled: !!currentUser && !!targetPerson,
   });
+
+  const isLoading = isLoadingPaths;
 
   // Auto-select first path when results arrive
   useEffect(() => {
