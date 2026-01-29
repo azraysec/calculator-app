@@ -1,6 +1,6 @@
 {
   "name": "@wig/web",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -30,6 +30,7 @@
     "@wig/db": "workspace:*",
     "@wig/shared-types": "workspace:*",
     "@xyflow/react": "^12.10.0",
+    "adm-zip": "^0.5.16",
     "ai": "^4.2.5",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
