@@ -1,0 +1,341 @@
+# WIG Requirements Tracker
+# Updated automatically by Steve (CEO Manager)
+# User adds new requirements, Steve updates status
+
+metadata:
+  last_updated: 2026-01-29
+  current_version: "0.7.0"
+  next_version: "0.8.0"
+
+requirements:
+  - id: REQ-001
+    title: "Fix LinkedIn messages not processing (zero messages bug)"
+    status: COMPLETED
+    priority: CRITICAL
+    created: 2026-01-29
+    planning:
+      completed: true
+      date: 2026-01-29
+      notes: "Identified root cause - findFile() using endsWith() matched guide_messages.csv instead of messages.csv"
+    design:
+      completed: true
+      date: 2026-01-29
+      approach: "Change to exact filename matching with path support"
+      architect_approved: true
+    spec:
+      completed: true
+      date: 2026-01-29
+      details: "findFile() must match exact filename or path ending with /filename, not just endsWith()"
+    implementation:
+      status: COMPLETED
+      date: 2026-01-29
+      version: "0.7.0"
+      files:
+        - "packages/adapters/src/linkedin/archive-parser.ts"
+      tests_added: 15
+      tests_passing: true
+    bugs:
+      - description: "endsWith() matched guide_messages.csv (113 bytes) before messages.csv (4MB)"
+        fixed: true
+        fixed_in: "0.7.0"
+    deployed: true
+    deployed_version: "0.7.0"
+    verification: "Messages will be processed on next LinkedIn archive upload"
+
+  - id: REQ-002
+    title: "Fix duplicate persons created on LinkedIn re-upload"
+    status: COMPLETED
+    priority: CRITICAL
+    created: 2026-01-29
+    planning:
+      completed: true
+      date: 2026-01-29
+      notes: "97% of connections have no email, upsertPerson() only searched by email causing duplicates"
+    design:
+      completed: true
+      date: 2026-01-29
+      approach: "Add name-based search when no email, update emails when found by name"
+      architect_approved: true
+    spec:
+      completed: true
+      date: 2026-01-29
+      details: |
+        1. Search by email first (existing behavior)
+        2. If not found by email, search by name
+        3. If found by name, update their email if we have one
+        4. Only create new person if not found by email or name
+    implementation:
+      status: COMPLETED
+      date: 2026-01-29
+      version: "0.7.0"
+      files:
+        - "packages/adapters/src/linkedin/archive-parser.ts"
+      tests_added: 15
+      tests_passing: true
+    bugs:
+      - description: "8,491 duplicate persons created across 3 uploads (4,243 connections without emails)"
+        fixed: true
+        fixed_in: "0.7.0"
+    deployed: true
+    deployed_version: "0.7.0"
+    verification: "No duplicates will be created on future uploads"
+
+  - id: REQ-003
+    title: "Clean up existing 8,491 duplicate persons from database"
+    status: COMPLETED
+    priority: HIGH
+    created: 2026-01-29
+    planning:
+      completed: true
+      date: 2026-01-29
+      notes: "Need to delete duplicates while preserving edges and evidence"
+    design:
+      completed: true
+      date: 2026-01-29
+      approach: "Use CASCADE delete - foreign keys auto-delete edges"
+      architect_approved: true
+    spec:
+      completed: true
+      date: 2026-01-29
+      details: |
+        1. Find all duplicate persons by name (no email)
+        2. Group by name, keep oldest (first created)
+        3. Delete duplicates using CASCADE (auto-deletes edges)
+    implementation:
+      status: COMPLETED
+      date: 2026-01-29
+      version: "0.7.0"
+      files:
+        - "scripts/cleanup-duplicates-fast.ts"
+        - "scripts/debug-upload.ts"
+        - "scripts/check-job-logs.ts"
+      tests_added: 0
+      tests_passing: true
+    bugs: []
+    deployed: true
+    deployed_version: "0.7.0"
+    verification: "Cleanup script successfully deleted 8,491 duplicate persons"
+
+  - id: REQ-004
+    title: "Connections browser with filtering and sorting"
+    status: COMPLETED
+    priority: MEDIUM
+    created: 2026-01-29
+    planning:
+      completed: true
+      date: 2026-01-29
+      notes: "Full data grid for browsing all connections"
+    design:
+      completed: true
+      date: 2026-01-29
+      approach: "TanStack Table with server-side pagination, filtering, sorting"
+      architect_approved: true
+    spec:
+      completed: true
+      date: 2026-01-29
+      details: |
+        - Filter by name, email, title, company
+        - Sort any column
+        - Pagination (50 per page)
+        - Show sources (linkedin, email, etc.)
+        - Show connection and interaction counts
+    implementation:
+      status: COMPLETED
+      date: 2026-01-29
+      version: "0.7.0"
+      files:
+        - "apps/web/components/connections/connections-grid.tsx"
+        - "apps/web/app/api/connections/route.ts"
+        - "apps/web/components/ui/table.tsx"
+        - "apps/web/app/page.tsx"
+      tests_added: 0
+      tests_passing: true
+    bugs: []
+    deployed: true
+    deployed_version: "0.7.0"
+    verification: "New 'Connections' tab visible in main interface"
+
+  - id: REQ-005
+    title: "Upload history with new vs existing breakdown"
+    status: COMPLETED
+    priority: MEDIUM
+    created: 2026-01-29
+    planning:
+      completed: true
+      date: 2026-01-29
+      notes: "Show detailed breakdown of each upload"
+    design:
+      completed: true
+      date: 2026-01-29
+      approach: "Track new vs existing in ingest job metadata, display in history component"
+      architect_approved: true
+    spec:
+      completed: true
+      date: 2026-01-29
+      details: |
+        - Total uploads
+        - Per upload: connections (total, new, existing), messages (total, new, existing)
+        - Aggregate statistics across all uploads
+    implementation:
+      status: COMPLETED
+      date: 2026-01-29
+      version: "0.7.0"
+      files:
+        - "apps/web/components/data-sources/linkedin-upload-history.tsx"
+        - "apps/web/app/api/linkedin/archive/history/route.ts"
+        - "packages/adapters/src/linkedin/archive-parser.ts"
+      tests_added: 0
+      tests_passing: true
+    bugs: []
+    deployed: true
+    deployed_version: "0.7.0"
+    verification: "Upload history shows new vs existing breakdown"
+
+  - id: REQ-006
+    title: "Steve CEO Manager workflow system"
+    status: COMPLETED
+    priority: HIGH
+    created: 2026-01-29
+    planning:
+      completed: true
+      date: 2026-01-29
+      notes: "Single point of contact, procedure-based workflow"
+    design:
+      completed: true
+      date: 2026-01-29
+      approach: "Workflow file that defines Steve's process for every request"
+      architect_approved: true
+    spec:
+      completed: true
+      date: 2026-01-29
+      details: |
+        1. Check requirements tracker (ALWAYS FIRST)
+        2. Load MASTER-PROCEDURE
+        3. Execute specialized procedure
+        4. Quality gate (build + test)
+        5. Deploy & update requirements
+    implementation:
+      status: COMPLETED
+      date: 2026-01-29
+      version: "0.7.0"
+      files:
+        - ".claude/steve-ceo-workflow.md"
+      tests_added: 0
+      tests_passing: true
+    bugs: []
+    deployed: true
+    deployed_version: "0.7.0"
+    verification: "Steve workflow documented and ready to use"
+
+  - id: REQ-007
+    title: "Procedure-based system for all request types"
+    status: COMPLETED
+    priority: HIGH
+    created: 2026-01-29
+    planning:
+      completed: true
+      date: 2026-01-29
+      notes: "Master procedure + specialized procedures for each request type"
+    design:
+      completed: true
+      date: 2026-01-29
+      approach: "Markdown files in .claude/procedures/ directory"
+      architect_approved: true
+    spec:
+      completed: true
+      date: 2026-01-29
+      details: |
+        - MASTER-PROCEDURE.md - Universal workflow
+        - bug-fix.md - Fix broken functionality
+        - new-feature.md - Build new capability
+        - database-migration.md - Schema/data changes
+        - deployment-fix.md - Build/deploy issues
+        - investigation.md - Debug/research tasks
+        - performance-optimization.md - Speed improvements
+    implementation:
+      status: COMPLETED
+      date: 2026-01-29
+      version: "0.7.0"
+      files:
+        - ".claude/procedures/MASTER-PROCEDURE.md"
+        - ".claude/procedures/bug-fix.md"
+        - ".claude/procedures/new-feature.md"
+        - ".claude/procedures/database-migration.md"
+        - ".claude/procedures/deployment-fix.md"
+        - ".claude/procedures/investigation.md"
+        - ".claude/procedures/performance-optimization.md"
+      tests_added: 0
+      tests_passing: true
+    bugs: []
+    deployed: true
+    deployed_version: "0.7.0"
+    verification: "All 7 procedures created and documented"
+
+  - id: REQ-008
+    title: "Requirements tracking system"
+    status: COMPLETED
+    priority: HIGH
+    created: 2026-01-29
+    planning:
+      completed: true
+      date: 2026-01-29
+      notes: "YAML-based tracking system that Steve checks constantly"
+    design:
+      completed: true
+      date: 2026-01-29
+      approach: "YAML file at .claude/requirements.yaml with structured tracking"
+      architect_approved: true
+    spec:
+      completed: true
+      date: 2026-01-29
+      details: |
+        Each requirement tracks:
+        - Planning (completed, notes)
+        - Design (completed, approach, architect approval)
+        - Detailed spec (completed, details)
+        - Implementation (status, version, files, tests)
+        - Bugs (found, fixed, version)
+        - Deployment (deployed, version, verification)
+    implementation:
+      status: COMPLETED
+      date: 2026-01-29
+      version: "0.7.0"
+      files:
+        - ".claude/requirements.yaml"
+      tests_added: 0
+      tests_passing: true
+    bugs: []
+    deployed: true
+    deployed_version: "0.7.0"
+    verification: "Requirements tracker created with all completed work documented"
+
+# Template for new requirements (copy and modify as needed)
+# - id: REQ-XXX
+#   title: "Requirement title"
+#   status: NEW  # NEW | PLANNING | IN_PROGRESS | TESTING | COMPLETED | BLOCKED
+#   priority: MEDIUM  # LOW | MEDIUM | HIGH | CRITICAL
+#   created: YYYY-MM-DD
+#   planning:
+#     completed: false
+#     date: null
+#     notes: ""
+#   design:
+#     completed: false
+#     date: null
+#     approach: ""
+#     architect_approved: false
+#   spec:
+#     completed: false
+#     date: null
+#     details: ""
+#   implementation:
+#     status: NOT_STARTED  # NOT_STARTED | IN_PROGRESS | COMPLETED
+#     date: null
+#     version: null
+#     files: []
+#     tests_added: 0
+#     tests_passing: false
+#   bugs: []
+#   deployed: false
+#   deployed_version: null
+#   verification: ""
