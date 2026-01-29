@@ -21,6 +21,7 @@ import { SyncHealthWidget } from '@/components/data-sources/sync-health-widget';
 import { LinkedInUploadDialog } from '@/components/data-sources/linkedin-upload-dialog';
 import { LinkedInUploadHistory } from '@/components/data-sources/linkedin-upload-history';
 import { ConnectionsGrid } from '@/components/connections/connections-grid';
+import { CreateIssueDialog } from '@/components/github/create-issue-dialog';
 
 interface Person {
   id: string;
@@ -536,6 +537,9 @@ export default function IntroFinderPage() {
           <RequirementsTable />
         </TabsContent>
       </Tabs>
+
+      {/* Global Create Issue Dialog (Ctrl+F) */}
+      <CreateIssueDialog />
     </div>
   );
 }

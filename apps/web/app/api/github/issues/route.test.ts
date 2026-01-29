@@ -17,7 +17,7 @@ vi.mock('util', async () => {
 });
 
 // Import after mocks are set up
-const { GET } = await import('./route');
+const { GET, POST } = await import('./route');
 
 describe('GitHub Issues API', () => {
   beforeEach(() => {
@@ -219,6 +219,165 @@ describe('GitHub Issues API', () => {
 
       expect(response.status).toBe(200);
       expect(data.issues).toEqual([]);
+    });
+  });
+
+  describe('POST /api/github/issues', () => {
+    it('should create a GitHub issue successfully', async () => {
+      const mockIssueUrl = 'https://github.com/test/repo/issues/15';
+      mockExecAsync.mockResolvedValue({ stdout: mockIssueUrl, stderr: '' });
+
+      const requestBody = {
+        title: 'New feature request',
+        description: 'Add support for X',
+        priority: 'P1-High',
+        labels: ['enhancement'],
+      };
+
+      const request = new NextRequest('http://localhost:3000/api/github/issues', {
+        method: 'POST',
+        body: JSON.stringify(requestBody),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(201);
+      expect(data.success).toBe(true);
+      expect(data.issueNumber).toBe(15);
+      expect(data.issueUrl).toBe(mockIssueUrl);
+      expect(data.message).toContain('#15');
+    });
+
+    it('should return 400 when title is missing', async () => {
+      const requestBody = {
+        description: 'Some description',
+      };
+
+      const request = new NextRequest('http://localhost:3000/api/github/issues', {
+        method: 'POST',
+        body: JSON.stringify(requestBody),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toContain('Title is required');
+    });
+
+    it('should handle issues without description', async () => {
+      const mockIssueUrl = 'https://github.com/test/repo/issues/16';
+      mockExecAsync.mockResolvedValue({ stdout: mockIssueUrl, stderr: '' });
+
+      const requestBody = {
+        title: 'Simple issue',
+      };
+
+      const request = new NextRequest('http://localhost:3000/api/github/issues', {
+        method: 'POST',
+        body: JSON.stringify(requestBody),
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(201);
+
+      // Verify gh command doesn't include --body
+      expect(mockExecAsync).toHaveBeenCalledWith(
+        expect.stringContaining('--title "Simple issue"'),
+        expect.any(Object)
+      );
+      expect(mockExecAsync).not.toHaveBeenCalledWith(
+        expect.stringContaining('--body'),
+        expect.any(Object)
+      );
+    });
+
+    it('should handle multiple labels', async () => {
+      const mockIssueUrl = 'https://github.com/test/repo/issues/17';
+      mockExecAsync.mockResolvedValue({ stdout: mockIssueUrl, stderr: '' });
+
+      const requestBody = {
+        title: 'Bug report',
+        priority: 'P0-Critical',
+        labels: ['bug', 'urgent'],
+      };
+
+      const request = new NextRequest('http://localhost:3000/api/github/issues', {
+        method: 'POST',
+        body: JSON.stringify(requestBody),
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(201);
+
+      // Verify labels are included in command
+      expect(mockExecAsync).toHaveBeenCalledWith(
+        expect.stringContaining('--label "P0-Critical,bug,urgent"'),
+        expect.any(Object)
+      );
+    });
+
+    it('should escape quotes in title and description', async () => {
+      const mockIssueUrl = 'https://github.com/test/repo/issues/18';
+      mockExecAsync.mockResolvedValue({ stdout: mockIssueUrl, stderr: '' });
+
+      const requestBody = {
+        title: 'Issue with "quotes"',
+        description: 'Description with "more quotes"',
+      };
+
+      const request = new NextRequest('http://localhost:3000/api/github/issues', {
+        method: 'POST',
+        body: JSON.stringify(requestBody),
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(201);
+
+      // Verify quotes are escaped
+      expect(mockExecAsync).toHaveBeenCalledWith(
+        expect.stringContaining('Issue with \\"quotes\\"'),
+        expect.any(Object)
+      );
+    });
+
+    it('should handle GitHub CLI not installed', async () => {
+      mockExecAsync.mockRejectedValue(new Error('gh: command not found'));
+
+      const requestBody = {
+        title: 'Test issue',
+      };
+
+      const request = new NextRequest('http://localhost:3000/api/github/issues', {
+        method: 'POST',
+        body: JSON.stringify(requestBody),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toContain('GitHub CLI');
+    });
+
+    it('should handle authentication errors', async () => {
+      mockExecAsync.mockRejectedValue(new Error('authentication required'));
+
+      const requestBody = {
+        title: 'Test issue',
+      };
+
+      const request = new NextRequest('http://localhost:3000/api/github/issues', {
+        method: 'POST',
+        body: JSON.stringify(requestBody),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(401);
+      expect(data.error).toContain('Not authenticated');
     });
   });
 });
