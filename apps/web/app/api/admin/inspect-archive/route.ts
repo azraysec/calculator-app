@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import AdmZip from 'adm-zip';
-import { writeFileSync, readFileSync, unlinkSync } from 'fs';
+import { writeFileSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
