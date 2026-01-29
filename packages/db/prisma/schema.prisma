@@ -553,3 +553,62 @@ enum IngestJobStatus {
   failed
   cancelled
 }
+
+// ============================================================================
+// CHANGELOG & REQUIREMENT TRACKING
+// ============================================================================
+
+/// ChangelogEntry tracks all development work including requirements, tasks, and bugs
+/// Replaces static REQUIREMENTS array with dynamic, real-time tracking
+model ChangelogEntry {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Entry identification
+  entryId     String @unique // REQ-001, TASK-001, BUG-001
+  requirement String // Title/description of the work
+
+  // Classification
+  priority ChangelogPriority // Critical, High, Medium, Low
+  status   ChangelogStatus   @default(planned) // Planned, In Progress, In Review, Done, Blocked, On Hold
+  category String // Feature, Enhancement, Bug Fix, Infrastructure, Quality
+
+  // Details
+  notes String? // Additional context and technical details
+
+  // Lifecycle timestamps
+  dateAdded     DateTime
+  dateStarted   DateTime?
+  dateCompleted DateTime?
+
+  // Version tracking
+  version String? // Version where this was completed (e.g., "0.8.1")
+
+  // GitHub integration
+  githubIssueNumber Int?    // GitHub issue number (e.g., 5 for issue #5)
+  githubIssueUrl    String? // Full GitHub issue URL
+
+  // Performance indexes
+  @@index([status])
+  @@index([priority])
+  @@index([dateAdded])
+  @@index([githubIssueNumber])
+  @@map("changelog_entries")
+}
+
+enum ChangelogPriority {
+  critical
+  high
+  medium
+  low
+}
+
+enum ChangelogStatus {
+  planned
+  in_progress
+  in_review
+  done
+  blocked
+  on_hold
+}

@@ -1,35 +1,11 @@
-'use client';
-
 /**
- * Requirements Table Component
- * Displays product backlog with status, priority, dates, sorting, and search
- * Now fetches from database with real-time updates
+ * Migration Script: Populate Changelog Database
+ * Migrates existing static changelog entries to database
  */
 
-import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Badge } from '@/components/ui/badge';
-import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Search, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw } from 'lucide-react';
+import { prisma } from '@wig/db';
 
-interface Requirement {
-  id: string;
-  requirement: string;
-  priority: 'Critical' | 'High' | 'Medium' | 'Low';
-  status: 'Planned' | 'In Progress' | 'In Review' | 'Done' | 'Blocked' | 'On Hold';
-  category: string;
-  notes?: string;
-  dateAdded: string;
-  dateStarted?: string;
-  dateCompleted?: string;
-  version?: string;
-  githubIssueNumber?: number;
-  githubIssueUrl?: string;
-}
-
-// Static fallback data - will be replaced by database entries
-const STATIC_REQUIREMENTS: Requirement[] = [
+const STATIC_REQUIREMENTS = [
   {
     id: 'REQ-001',
     requirement: 'Add changelog tab to UI',
@@ -375,7 +351,7 @@ const STATIC_REQUIREMENTS: Requirement[] = [
     priority: 'Critical',
     status: 'Done',
     category: 'Bug Fix',
-    notes: 'Root cause: currentUserId was hardcoded to "me" (not a valid UUID), causing API to fail. Created /api/me endpoint that returns current user\'s person record (identified by metadata.isMe = true). Updated frontend to fetch current user from /api/me before running pathfinding queries. Pathfinding now works correctly.',
+    notes: "Root cause: currentUserId was hardcoded to \"me\" (not a valid UUID), causing API to fail. Created /api/me endpoint that returns current user's person record (identified by metadata.isMe = true). Updated frontend to fetch current user from /api/me before running pathfinding queries. Pathfinding now works correctly.",
     dateAdded: '2026-01-30',
     dateStarted: '2026-01-30',
     dateCompleted: '2026-01-30',
@@ -404,255 +380,75 @@ const STATIC_REQUIREMENTS: Requirement[] = [
   },
 ];
 
-type SortField = keyof Requirement;
-type SortDirection = 'asc' | 'desc';
+async function migrateChangelog() {
+  console.log('Starting changelog migration...');
+  console.log(`Found ${STATIC_REQUIREMENTS.length} entries to migrate`);
 
-function getPriorityColor(priority: Requirement['priority']) {
-  switch (priority) {
-    case 'Critical':
-      return 'bg-red-500 text-white';
-    case 'High':
-      return 'bg-orange-500 text-white';
-    case 'Medium':
-      return 'bg-yellow-500 text-black';
-    case 'Low':
-      return 'bg-gray-400 text-white';
-  }
-}
+  let successCount = 0;
+  let skipCount = 0;
 
-function getStatusColor(status: Requirement['status']) {
-  switch (status) {
-    case 'Done':
-      return 'bg-green-500 text-white';
-    case 'In Progress':
-      return 'bg-blue-500 text-white';
-    case 'In Review':
-      return 'bg-purple-500 text-white';
-    case 'Planned':
-      return 'bg-gray-500 text-white';
-    case 'Blocked':
-      return 'bg-red-600 text-white';
-    case 'On Hold':
-      return 'bg-gray-600 text-white';
-  }
-}
+  for (const req of STATIC_REQUIREMENTS) {
+    try {
+      // Check if entry already exists
+      const existing = await prisma.changelogEntry.findUnique({
+        where: { entryId: req.id },
+      });
 
-export function RequirementsTable() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortField, setSortField] = useState<SortField>('id');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
-
-  // Fetch changelog from API with real-time polling (every 5 seconds)
-  const { data: changelogData, isLoading, error } = useQuery<{ entries: Requirement[] }>({
-    queryKey: ['changelog'],
-    queryFn: async () => {
-      const res = await fetch('/api/changelog');
-      if (!res.ok) {
-        throw new Error('Failed to fetch changelog');
+      if (existing) {
+        console.log(`  ⏭️  Skipping ${req.id} (already exists)`);
+        skipCount++;
+        continue;
       }
-      return res.json();
-    },
-    refetchInterval: 5000, // Poll every 5 seconds for real-time updates
-    refetchIntervalInBackground: true,
-  });
 
-  const REQUIREMENTS = changelogData?.entries || STATIC_REQUIREMENTS;
+      // Create entry
+      await prisma.changelogEntry.create({
+        data: {
+          entryId: req.id,
+          requirement: req.requirement,
+          priority: req.priority.toLowerCase() as any,
+          status: formatStatusForDb(req.status),
+          category: req.category,
+          notes: req.notes || null,
+          dateAdded: new Date(req.dateAdded),
+          dateStarted: req.dateStarted ? new Date(req.dateStarted) : null,
+          dateCompleted: req.dateCompleted ? new Date(req.dateCompleted) : null,
+        },
+      });
 
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortDirection('asc');
+      console.log(`  ✅ Migrated ${req.id}: ${req.requirement}`);
+      successCount++;
+    } catch (error) {
+      console.error(`  ❌ Failed to migrate ${req.id}:`, error);
     }
-  };
+  }
 
-  const filteredAndSortedRequirements = useMemo(() => {
-    // Filter by search query
-    let filtered = REQUIREMENTS.filter((req) => {
-      const query = searchQuery.toLowerCase();
-      return (
-        req.id.toLowerCase().includes(query) ||
-        req.requirement.toLowerCase().includes(query) ||
-        req.category.toLowerCase().includes(query) ||
-        req.notes?.toLowerCase().includes(query) ||
-        req.status.toLowerCase().includes(query) ||
-        req.priority.toLowerCase().includes(query)
-      );
-    });
-
-    // Sort by selected field
-    filtered.sort((a, b) => {
-      const aValue = a[sortField] || '';
-      const bValue = b[sortField] || '';
-
-      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
-      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
-      return 0;
-    });
-
-    return filtered;
-  }, [searchQuery, sortField, sortDirection]);
-
-  const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field) return <ArrowUpDown className="w-3 h-3 inline ml-1 opacity-50" />;
-    return sortDirection === 'asc' ? (
-      <ArrowUp className="w-3 h-3 inline ml-1" />
-    ) : (
-      <ArrowDown className="w-3 h-3 inline ml-1" />
-    );
-  };
-
-  return (
-    <Card className="p-6">
-      <div className="mb-4">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-2xl font-bold">Development Changelog</h2>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            {isLoading && <RefreshCw className="w-4 h-4 animate-spin" />}
-            {error && <span className="text-red-500">Error loading changelog</span>}
-            <span className="text-green-500">● Live</span>
-          </div>
-        </div>
-        <p className="text-sm text-muted-foreground mb-4">
-          Feature requests, improvements, bug fixes, and all development tasks tracked for WIG. Updates in real-time.
-        </p>
-
-        {/* Search Box */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            type="text"
-            placeholder="Search by ID, requirement, category, status, notes..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-
-        {searchQuery && (
-          <div className="mt-2 text-sm text-muted-foreground">
-            Showing {filteredAndSortedRequirements.length} of {REQUIREMENTS.length} items
-          </div>
-        )}
-      </div>
-
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse">
-          <thead>
-            <tr className="border-b-2">
-              <th
-                className="text-left p-3 font-semibold cursor-pointer hover:bg-muted/50"
-                onClick={() => handleSort('id')}
-              >
-                ID <SortIcon field="id" />
-              </th>
-              <th
-                className="text-left p-3 font-semibold cursor-pointer hover:bg-muted/50"
-                onClick={() => handleSort('requirement')}
-              >
-                Requirement <SortIcon field="requirement" />
-              </th>
-              <th
-                className="text-left p-3 font-semibold cursor-pointer hover:bg-muted/50"
-                onClick={() => handleSort('priority')}
-              >
-                Priority <SortIcon field="priority" />
-              </th>
-              <th
-                className="text-left p-3 font-semibold cursor-pointer hover:bg-muted/50"
-                onClick={() => handleSort('status')}
-              >
-                Status <SortIcon field="status" />
-              </th>
-              <th
-                className="text-left p-3 font-semibold cursor-pointer hover:bg-muted/50"
-                onClick={() => handleSort('category')}
-              >
-                Category <SortIcon field="category" />
-              </th>
-              <th
-                className="text-left p-3 font-semibold cursor-pointer hover:bg-muted/50"
-                onClick={() => handleSort('dateAdded')}
-              >
-                Date Added <SortIcon field="dateAdded" />
-              </th>
-              <th
-                className="text-left p-3 font-semibold cursor-pointer hover:bg-muted/50"
-                onClick={() => handleSort('dateStarted')}
-              >
-                Date Started <SortIcon field="dateStarted" />
-              </th>
-              <th
-                className="text-left p-3 font-semibold cursor-pointer hover:bg-muted/50"
-                onClick={() => handleSort('dateCompleted')}
-              >
-                Date Completed <SortIcon field="dateCompleted" />
-              </th>
-              <th className="text-left p-3 font-semibold">Notes</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredAndSortedRequirements.map((req) => (
-              <tr key={req.id} className="border-b hover:bg-muted/50">
-                <td className="p-3 font-mono text-sm">{req.id}</td>
-                <td className="p-3">{req.requirement}</td>
-                <td className="p-3">
-                  <Badge className={getPriorityColor(req.priority)}>
-                    {req.priority}
-                  </Badge>
-                </td>
-                <td className="p-3">
-                  <Badge className={getStatusColor(req.status)}>
-                    {req.status}
-                  </Badge>
-                </td>
-                <td className="p-3">
-                  <span className="text-sm text-muted-foreground">
-                    {req.category}
-                  </span>
-                </td>
-                <td className="p-3 text-sm">{req.dateAdded}</td>
-                <td className="p-3 text-sm">{req.dateStarted || '-'}</td>
-                <td className="p-3 text-sm">{req.dateCompleted || '-'}</td>
-                <td className="p-3 text-sm text-muted-foreground max-w-md">
-                  {req.notes}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="mt-6 pt-6 border-t">
-        <h3 className="font-semibold mb-2">Status Definitions</h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
-          <div>
-            <Badge className="bg-gray-500 text-white mr-2">Planned</Badge>
-            <span className="text-muted-foreground">Not started</span>
-          </div>
-          <div>
-            <Badge className="bg-blue-500 text-white mr-2">In Progress</Badge>
-            <span className="text-muted-foreground">Currently implementing</span>
-          </div>
-          <div>
-            <Badge className="bg-purple-500 text-white mr-2">In Review</Badge>
-            <span className="text-muted-foreground">Under review</span>
-          </div>
-          <div>
-            <Badge className="bg-green-500 text-white mr-2">Done</Badge>
-            <span className="text-muted-foreground">Shipped to production</span>
-          </div>
-          <div>
-            <Badge className="bg-red-600 text-white mr-2">Blocked</Badge>
-            <span className="text-muted-foreground">Cannot proceed</span>
-          </div>
-          <div>
-            <Badge className="bg-gray-600 text-white mr-2">On Hold</Badge>
-            <span className="text-muted-foreground">Deprioritized</span>
-          </div>
-        </div>
-      </div>
-    </Card>
-  );
+  console.log('\nMigration complete!');
+  console.log(`  Created: ${successCount}`);
+  console.log(`  Skipped: ${skipCount}`);
+  console.log(`  Total: ${STATIC_REQUIREMENTS.length}`);
 }
+
+function formatStatusForDb(frontendStatus: string): string {
+  switch (frontendStatus) {
+    case 'Planned':
+      return 'planned';
+    case 'In Progress':
+      return 'in_progress';
+    case 'In Review':
+      return 'in_review';
+    case 'Done':
+      return 'done';
+    case 'Blocked':
+      return 'blocked';
+    case 'On Hold':
+      return 'on_hold';
+    default:
+      return 'planned';
+  }
+}
+
+migrateChangelog()
+  .catch((error) => {
+    console.error('Migration failed:', error);
+    process.exit(1);
+  });

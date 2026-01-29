@@ -4,8 +4,8 @@
 
 metadata:
   last_updated: 2026-01-30
-  current_version: "0.8.1"
-  next_version: "0.9.0"
+  current_version: "0.9.0"
+  next_version: "0.10.0"
 
 requirements:
   - id: REQ-001
@@ -373,6 +373,50 @@ requirements:
     deployed: true
     deployed_version: "0.7.1"
     verification: "All procedures include version bump and changelog update steps. GitHub Issues set up as primary tracker. Steve's workflow updated to report version numbers."
+
+  - id: REQ-009
+    title: "Dynamic changelog from database with real-time updates (Issue #9)"
+    status: COMPLETED
+    priority: MEDIUM
+    created: 2026-01-30
+    planning:
+      completed: true
+      date: 2026-01-30
+      notes: "Replace static REQUIREMENTS array with database-backed system that updates in real-time"
+    design:
+      completed: true
+      date: 2026-01-30
+      approach: "Create ChangelogEntry model in Prisma, API endpoints, update UI with React Query polling"
+      architect_approved: true
+    spec:
+      completed: true
+      date: 2026-01-30
+      details: |
+        1. Add ChangelogEntry model to Prisma schema with all existing fields plus GitHub integration
+        2. Create database migration
+        3. Create GET /api/changelog endpoint to fetch all entries
+        4. Create POST /api/changelog endpoint to create new entries
+        5. Update RequirementsTable component to fetch from API with 5-second polling
+        6. Migrate all 34 existing static entries to database
+        7. Add comprehensive unit tests for API endpoints
+        8. Show live indicator in UI when polling
+    implementation:
+      status: COMPLETED
+      date: 2026-01-30
+      version: "0.9.0"
+      files:
+        - "packages/db/prisma/schema.prisma"
+        - "apps/web/app/api/changelog/route.ts"
+        - "apps/web/app/api/changelog/route.test.ts"
+        - "apps/web/components/backlog/requirements-table.tsx"
+        - "scripts/migrate-changelog-to-db.ts"
+        - "apps/web/package.json"
+      tests_added: 8
+      tests_passing: true
+    bugs: []
+    deployed: true
+    deployed_version: "0.9.0"
+    verification: "Changelog now loads from database with real-time updates (5s polling). Shows live indicator. All 34 existing entries migrated. 8 unit tests passing."
 
 # Template for new requirements (copy and modify as needed)
 # - id: REQ-XXX
