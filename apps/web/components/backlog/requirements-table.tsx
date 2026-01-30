@@ -492,21 +492,29 @@ export function RequirementsTable() {
     const issues = issuesData?.issues || [];
 
     // Convert GitHub issues to Requirement format
-    const issueRequirements: Requirement[] = issues.map((issue) => ({
-      id: `#${issue.number}`,
-      requirement: issue.title,
-      priority: issue.priority || 'Medium',
-      status: issue.status,
+    const issueRequirements: Requirement[] = issues.map((issue) => {
+      // Map GitHub status to Requirement status
+      const status: Requirement['status'] =
+        issue.status === 'Closed' ? 'Done' :
+        issue.status === 'In Progress' ? 'In Progress' :
+        'Planned'; // 'Open' maps to 'Planned'
+
+      return {
+        id: `#${issue.number}`,
+        requirement: issue.title,
+        priority: issue.priority || 'Medium',
+        status,
       category: issue.labels.find((l) => ['bug', 'enhancement', 'feature'].includes(l))
         ? issue.labels.find((l) => ['bug', 'enhancement', 'feature'].includes(l))!
         : 'Feature',
       notes: `GitHub Issue #${issue.number} - ${issue.labels.join(', ')}`,
       dateAdded: new Date(issue.createdAt).toISOString().split('T')[0],
       dateStarted: issue.status === 'In Progress' ? new Date(issue.updatedAt).toISOString().split('T')[0] : undefined,
-      dateCompleted: issue.state === 'closed' ? new Date(issue.updatedAt).toISOString().split('T')[0] : undefined,
-      githubIssueNumber: issue.number,
-      githubIssueUrl: issue.url,
-    }));
+        dateCompleted: issue.state === 'closed' ? new Date(issue.updatedAt).toISOString().split('T')[0] : undefined,
+        githubIssueNumber: issue.number,
+        githubIssueUrl: issue.url,
+      };
+    });
 
     // Merge and deduplicate (prefer changelog entries over GitHub issues for same number)
     const merged = [...changelog];
@@ -541,7 +549,7 @@ export function RequirementsTable() {
     // Filter by view (all/open/completed)
     let filtered = REQUIREMENTS;
     if (viewFilter === 'open') {
-      filtered = filtered.filter((req) => req.status === 'Open' || req.status === 'In Progress' || req.status === 'Planned');
+      filtered = filtered.filter((req) => req.status === 'In Progress' || req.status === 'Planned');
     } else if (viewFilter === 'completed') {
       filtered = filtered.filter((req) => req.status === 'Done');
     }
@@ -616,7 +624,7 @@ export function RequirementsTable() {
                 : 'bg-muted text-muted-foreground hover:bg-muted/80'
             }`}
           >
-            Open Issues ({REQUIREMENTS.filter((r) => r.status === 'Open' || r.status === 'In Progress' || r.status === 'Planned').length})
+            Open Issues ({REQUIREMENTS.filter((r) => r.status === 'In Progress' || r.status === 'Planned').length})
           </button>
           <button
             onClick={() => setViewFilter('completed')}
