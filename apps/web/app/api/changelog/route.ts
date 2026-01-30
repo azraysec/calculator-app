@@ -31,6 +31,8 @@ export async function GET() {
       version: entry.version || undefined,
       githubIssueNumber: entry.githubIssueNumber || undefined,
       githubIssueUrl: entry.githubIssueUrl || undefined,
+      sourceType: entry.sourceType,
+      sourceDetails: entry.sourceDetails || undefined,
     }));
 
     return NextResponse.json({ entries: transformed });
@@ -60,6 +62,8 @@ export async function POST(request: NextRequest) {
       version,
       githubIssueNumber,
       githubIssueUrl,
+      sourceType,
+      sourceDetails,
     } = body;
 
     // Validate required fields
@@ -89,6 +93,8 @@ export async function POST(request: NextRequest) {
         version: version || null,
         githubIssueNumber: githubIssueNumber || null,
         githubIssueUrl: githubIssueUrl || null,
+        sourceType: (sourceType || 'user_request') as 'github_issue' | 'user_request' | 'internal' | 'customer' | 'system',
+        sourceDetails: sourceDetails || null,
       },
     });
 

@@ -26,6 +26,8 @@ interface Requirement {
   version?: string;
   githubIssueNumber?: number;
   githubIssueUrl?: string;
+  sourceType?: 'github_issue' | 'user_request' | 'internal' | 'customer' | 'system';
+  sourceDetails?: string;
 }
 
 // Static fallback data - will be replaced by database entries
@@ -527,6 +529,8 @@ export function RequirementsTable() {
         dateCompleted: issue.state === 'closed' ? new Date(issue.updatedAt).toISOString().split('T')[0] : undefined,
         githubIssueNumber: issue.number,
         githubIssueUrl: issue.url,
+        sourceType: 'github_issue',
+        sourceDetails: `Created by ${issue.assignee || 'unassigned'}`,
       };
     });
 
@@ -705,6 +709,7 @@ export function RequirementsTable() {
               >
                 Category <SortIcon field="category" />
               </th>
+              <th className="text-left p-3 font-semibold">Source</th>
               <th
                 className="text-left p-3 font-semibold cursor-pointer hover:bg-muted/50"
                 onClick={() => handleSort('dateAdded')}
@@ -745,6 +750,15 @@ export function RequirementsTable() {
                   <span className="text-sm text-muted-foreground">
                     {req.category}
                   </span>
+                </td>
+                <td className="p-3">
+                  <Badge variant="outline" className="text-xs">
+                    {req.sourceType === 'github_issue' ? 'GitHub' :
+                     req.sourceType === 'user_request' ? 'User' :
+                     req.sourceType === 'internal' ? 'Internal' :
+                     req.sourceType === 'customer' ? 'Customer' :
+                     req.sourceType === 'system' ? 'System' : 'User'}
+                  </Badge>
                 </td>
                 <td className="p-3 text-sm">{req.dateAdded}</td>
                 <td className="p-3 text-sm">{req.dateStarted || '-'}</td>

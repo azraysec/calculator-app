@@ -694,11 +694,16 @@ model ChangelogEntry {
   githubIssueNumber Int? // GitHub issue number (e.g., 5 for issue #5)
   githubIssueUrl    String? // Full GitHub issue URL
 
+  // Source tracking
+  sourceType    ChangelogSource @default(user_request) // Where this requirement originated
+  sourceDetails String? // Additional source context (e.g., "Requested by CEO in standup")
+
   // Performance indexes
   @@index([status])
   @@index([priority])
   @@index([dateAdded])
   @@index([githubIssueNumber])
+  @@index([sourceType])
   @@map("changelog_entries")
 }
 
@@ -716,4 +721,12 @@ enum ChangelogStatus {
   done
   blocked
   on_hold
+}
+
+enum ChangelogSource {
+  github_issue    // Created from GitHub issue
+  user_request    // Direct user request in conversation
+  internal        // Internal initiative (Steve/team)
+  customer        // External customer feedback
+  system          // System-generated (e.g., dependency updates)
 }

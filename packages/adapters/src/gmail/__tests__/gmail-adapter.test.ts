@@ -249,7 +249,7 @@ describe('GmailAdapter', () => {
       expect(interaction.sourceId).toBe('msg-1');
       expect(interaction.sourceName).toBe('gmail');
       expect(interaction.channel).toBe('email');
-      expect(interaction.direction).toBe('2-way');
+      expect(interaction.direction).toBe('bidirectional');
       expect(interaction.participants).toEqual([
         'alice@example.com',
         'bob@example.com',
