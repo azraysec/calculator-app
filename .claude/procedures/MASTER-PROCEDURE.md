@@ -22,6 +22,11 @@
 2. Use TaskCreate to track all subtasks
 3. Delegate to specialized agents
 4. Monitor progress
+5. **Status Reports** (MANDATORY):
+   - Provide status update EVERY 10 MINUTES
+   - Include: timestamp (date + time), current task, progress, blockers
+   - Format: "## Status Report - [YYYY-MM-DD HH:MM]"
+   - Never stop to ask if should continue - ALWAYS continue with next priority
 
 ## Phase 3: Quality Gate (MANDATORY)
 1. Run full build: `pnpm run build`
@@ -29,11 +34,14 @@
 3. Verify no TypeScript errors
 4. Check deployment readiness
 
-## Phase 4: Version & Changelog Management (MANDATORY)
-1. **Bump Version** (in `apps/web/package.json`):
+## Phase 4: Version & Changelog Management (MANDATORY - EVERY DEPLOYMENT)
+1. **Bump Version ALWAYS** (in `apps/web/package.json`):
+   ⚠️ CRITICAL: Bump version on EVERY code change before commit, no exceptions
    - BUG_FIX → Patch (0.7.0 → 0.7.1)
    - NEW_FEATURE/ENHANCEMENT → Minor (0.7.0 → 0.8.0)
    - BREAKING_CHANGE → Major (0.7.0 → 1.0.0)
+   - Even logging/debug changes → Patch
+   - ANY deployment = version bump (makes tracking possible)
 
 2. **Update Changelog** (in `apps/web/components/backlog/requirements-table.tsx`):
    - Add new entry to REQUIREMENTS array
