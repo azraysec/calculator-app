@@ -7,6 +7,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
+import { signIn } from 'next-auth/react';
 import { ThreePanelLayout } from '@/components/layouts/three-panel-layout';
 import { PersonSearch } from '@/components/people/person-search';
 import { PathCard } from '@/components/paths/path-card';
@@ -23,6 +24,7 @@ import { LinkedInUploadDialog } from '@/components/data-sources/linkedin-upload-
 import { LinkedInUploadHistory } from '@/components/data-sources/linkedin-upload-history';
 import { ConnectionsGrid } from '@/components/connections/connections-grid';
 import { CreateIssueDialog } from '@/components/github/create-issue-dialog';
+import { FeedbackButton } from '@/components/feedback/feedback-button';
 
 interface Person {
   id: string;
@@ -200,7 +202,7 @@ export default function IntroFinderPage() {
   }, [pathsResult, selectedPath]);
 
   // Data sources handlers
-  const handleConnect = (sourceId: string) => {
+  const handleConnect = async (sourceId: string) => {
     const source = sources.find((s) => s.id === sourceId);
     if (!source) return;
 
@@ -208,9 +210,15 @@ export default function IntroFinderPage() {
       if (sourceId === 'linkedin') {
         setLinkedInDialogOpen(true);
       }
-    } else {
-      // OAuth flow would be triggered here
-      console.log('Triggering OAuth for', sourceId);
+    } else if (source.type === 'oauth') {
+      // Trigger OAuth flow
+      if (sourceId === 'gmail') {
+        await signIn('google', {
+          callbackUrl: '/?tab=sources&gmailConnected=true',
+        });
+      } else {
+        console.log('OAuth not implemented for', sourceId);
+      }
     }
   };
 
@@ -568,6 +576,9 @@ export default function IntroFinderPage() {
 
       {/* Global Create Issue Dialog (Ctrl+F) */}
       <CreateIssueDialog />
+
+      {/* Floating Feedback Button */}
+      <FeedbackButton />
     </div>
   );
 }
