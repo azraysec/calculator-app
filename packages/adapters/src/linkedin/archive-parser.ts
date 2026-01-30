@@ -71,6 +71,8 @@ export class LinkedInArchiveParser {
       const connectionsFile = this.findFile(entries, 'connections.csv');
       const messagesFile = this.findFile(entries, 'messages.csv');
 
+      console.log('[Parser] Total files in archive:', entries.length);
+      console.log('[Parser] All file names:', entries.map(e => e.entryName).join(', '));
       console.log('[Parser] Found connectionsFile:', connectionsFile?.entryName || 'NOT FOUND');
       console.log('[Parser] Found messagesFile:', messagesFile?.entryName || 'NOT FOUND');
 
