@@ -2,14 +2,10 @@
  * GitHub Issues API
  * GET /api/github/issues - Fetch all issues from repository
  * POST /api/github/issues - Create new GitHub issue
- * Integrates with GitHub CLI (gh) for authentication
+ * Uses GitHub REST API with GITHUB_TOKEN environment variable
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-
-const execAsync = promisify(exec);
 
 interface GitHubIssue {
   number: number;
@@ -30,53 +26,74 @@ export async function GET(request: NextRequest) {
     const state = searchParams.get('state') || 'all'; // all, open, closed
     const priority = searchParams.get('priority'); // P0-Critical, P1-High, etc.
 
-    // Fetch issues using GitHub CLI
-    // gh issue list --json number,title,state,labels,createdAt,updatedAt,assignees,url --limit 100
-    const cmd = `gh issue list --json number,title,state,labels,createdAt,updatedAt,assignees,url --limit 100 --state ${state}`;
-
-    const { stdout, stderr } = await execAsync(cmd, {
-      cwd: process.cwd(),
-      timeout: 10000,
-    });
-
-    if (stderr) {
-      console.error('GitHub CLI error:', stderr);
+    // Get GitHub token from environment
+    const githubToken = process.env.GITHUB_TOKEN;
+    if (!githubToken) {
+      return NextResponse.json(
+        { error: 'GITHUB_TOKEN environment variable not configured', issues: [] },
+        { status: 500 }
+      );
     }
 
-    const rawIssues = JSON.parse(stdout);
+    // Get repo owner and name from environment or default to azraysec/calculator-app
+    const repoOwner = process.env.GITHUB_REPO_OWNER || 'azraysec';
+    const repoName = process.env.GITHUB_REPO_NAME || 'calculator-app';
+
+    // Fetch issues via GitHub REST API
+    const apiUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/issues?state=${state}&per_page=100`;
+    const response = await fetch(apiUrl, {
+      headers: {
+        'Accept': 'application/vnd.github+json',
+        'Authorization': `Bearer ${githubToken}`,
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('GitHub API error:', errorData);
+      return NextResponse.json(
+        { error: `GitHub API error: ${errorData.message || response.statusText}`, issues: [] },
+        { status: response.status }
+      );
+    }
+
+    const rawIssues = await response.json();
 
     // Transform to our format
-    const issues: GitHubIssue[] = rawIssues.map((issue: any) => {
-      // Extract priority from labels
-      const priorityLabel = issue.labels.find((l: any) =>
-        ['P0-Critical', 'P1-High', 'P2-Medium', 'P3-Low'].includes(l.name)
-      );
-      const priority = priorityLabel
-        ? (priorityLabel.name.replace('P0-', '').replace('P1-', '').replace('P2-', '').replace('P3-', '') as any)
-        : null;
+    const issues: GitHubIssue[] = rawIssues
+      .filter((issue: any) => !issue.pull_request) // Exclude pull requests
+      .map((issue: any) => {
+        // Extract priority from labels
+        const priorityLabel = issue.labels.find((l: any) =>
+          ['P0-Critical', 'P1-High', 'P2-Medium', 'P3-Low'].includes(l.name)
+        );
+        const priority = priorityLabel
+          ? (priorityLabel.name.replace('P0-', '').replace('P1-', '').replace('P2-', '').replace('P3-', '') as any)
+          : null;
 
-      // Extract status from labels
-      const statusLabel = issue.labels.find((l: any) =>
-        ['in-progress', 'blocked'].includes(l.name)
-      );
-      let status: 'Open' | 'In Progress' | 'Closed' = issue.state === 'closed' ? 'Closed' : 'Open';
-      if (statusLabel?.name === 'in-progress') {
-        status = 'In Progress';
-      }
+        // Extract status from labels
+        const statusLabel = issue.labels.find((l: any) =>
+          ['in-progress', 'blocked'].includes(l.name)
+        );
+        let status: 'Open' | 'In Progress' | 'Closed' = issue.state === 'closed' ? 'Closed' : 'Open';
+        if (statusLabel?.name === 'in-progress') {
+          status = 'In Progress';
+        }
 
-      return {
-        number: issue.number,
-        title: issue.title,
-        state: issue.state,
-        labels: issue.labels.map((l: any) => l.name),
-        priority,
-        status,
-        createdAt: issue.createdAt,
-        updatedAt: issue.updatedAt,
-        assignee: issue.assignees?.[0]?.login || null,
-        url: issue.url,
-      };
-    });
+        return {
+          number: issue.number,
+          title: issue.title,
+          state: issue.state,
+          labels: issue.labels.map((l: any) => l.name),
+          priority,
+          status,
+          createdAt: issue.created_at,
+          updatedAt: issue.updated_at,
+          assignee: issue.assignee?.login || null,
+          url: issue.html_url,
+        };
+      });
 
     // Filter by priority if specified
     let filteredIssues = issues;
@@ -94,25 +111,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ issues: filteredIssues });
   } catch (error: any) {
     console.error('Error fetching GitHub issues:', error);
-
-    // Check if gh CLI is not installed
-    if (error.message?.includes('command not found') || error.message?.includes('not recognized')) {
-      return NextResponse.json(
-        { error: 'GitHub CLI (gh) not installed or not in PATH', issues: [] },
-        { status: 500 }
-      );
-    }
-
-    // Check if not authenticated
-    if (error.message?.includes('authentication') || error.message?.includes('401')) {
-      return NextResponse.json(
-        { error: 'Not authenticated with GitHub. Run: gh auth login', issues: [] },
-        { status: 401 }
-      );
-    }
-
     return NextResponse.json(
-      { error: 'Internal server error', issues: [] },
+      { error: 'Internal server error: ' + error.message, issues: [] },
       { status: 500 }
     );
   }
@@ -131,6 +131,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get GitHub token from environment
+    const githubToken = process.env.GITHUB_TOKEN;
+    if (!githubToken) {
+      return NextResponse.json(
+        { error: 'GITHUB_TOKEN environment variable not configured' },
+        { status: 500 }
+      );
+    }
+
+    // Get repo owner and name from environment or default to azraysec/calculator-app
+    const repoOwner = process.env.GITHUB_REPO_OWNER || 'azraysec';
+    const repoName = process.env.GITHUB_REPO_NAME || 'calculator-app';
+
     // Build labels list
     const allLabels: string[] = [];
     if (priority) {
@@ -140,62 +153,45 @@ export async function POST(request: NextRequest) {
       allLabels.push(...labels);
     }
 
-    // Build gh CLI command
-    let cmd = `gh issue create --title "${title.replace(/"/g, '\\"')}"`;
-
-    if (description) {
-      cmd += ` --body "${description.replace(/"/g, '\\"')}"`;
-    }
-
-    if (allLabels.length > 0) {
-      cmd += ` --label "${allLabels.join(',')}"`;
-    }
-
-    // Execute gh CLI command
-    const { stdout, stderr } = await execAsync(cmd, {
-      cwd: process.cwd(),
-      timeout: 10000,
+    // Create issue via GitHub REST API
+    const apiUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/issues`;
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/vnd.github+json',
+        'Authorization': `Bearer ${githubToken}`,
+        'X-GitHub-Api-Version': '2022-11-28',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        title,
+        body: description || undefined,
+        labels: allLabels,
+      }),
     });
 
-    if (stderr) {
-      console.error('GitHub CLI stderr:', stderr);
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('GitHub API error:', errorData);
+      return NextResponse.json(
+        { error: `GitHub API error: ${errorData.message || response.statusText}` },
+        { status: response.status }
+      );
     }
 
-    // Extract issue URL from stdout (gh returns the issue URL)
-    const issueUrl = stdout.trim();
-
-    // Parse issue number from URL
-    const match = issueUrl.match(/\/issues\/(\d+)$/);
-    const issueNumber = match ? parseInt(match[1]) : null;
+    const issue = await response.json();
 
     return NextResponse.json(
       {
         success: true,
-        issueUrl,
-        issueNumber,
-        message: `Issue #${issueNumber} created successfully`,
+        issueUrl: issue.html_url,
+        issueNumber: issue.number,
+        message: `Issue #${issue.number} created successfully`,
       },
       { status: 201 }
     );
   } catch (error: any) {
     console.error('Error creating GitHub issue:', error);
-
-    // Check if gh CLI is not installed
-    if (error.message?.includes('command not found') || error.message?.includes('not recognized')) {
-      return NextResponse.json(
-        { error: 'GitHub CLI (gh) not installed or not in PATH' },
-        { status: 500 }
-      );
-    }
-
-    // Check if not authenticated
-    if (error.message?.includes('authentication') || error.message?.includes('401')) {
-      return NextResponse.json(
-        { error: 'Not authenticated with GitHub. Run: gh auth login' },
-        { status: 401 }
-      );
-    }
-
     return NextResponse.json(
       { error: 'Failed to create issue: ' + error.message },
       { status: 500 }
