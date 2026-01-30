@@ -63,18 +63,22 @@
   - Set deployed_version to new version
   - Update metadata.current_version
 
-### 7. Deploy
+### 7. Deploy & Verify (MANDATORY)
 - Commit: "Fix: deployment issue - [brief description] - v[version]"
 - Push to master
-- Monitor Vercel deployment
-- Verify build succeeds
-- Check deployed site works
-
-### 7. Verify Production
-- Visit deployed URL
-- Test basic functionality
-- Check for console errors
-- Verify fix is live
+- **VERIFY DEPLOYMENT** (wait 1-2 minutes, then):
+  ```bash
+  vercel ls  # Check most recent deployment status
+  vercel inspect [url]  # Get deployment details
+  ```
+  - Confirm status is "● Ready" (not "● Error")
+  - If deployment still fails, repeat steps 3-6
+  - DO NOT proceed until deployment succeeds
+- **Verify Production**:
+  - Visit deployed URL
+  - Test basic functionality
+  - Check for console errors
+  - Verify fix is live
 
 ## Success Criteria
 - Build passes

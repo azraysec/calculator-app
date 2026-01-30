@@ -49,13 +49,26 @@
    - Update metadata.current_version
    - Mark requirement as COMPLETED with deployed_version
 
-## Phase 5: Deploy & Report
+## Phase 5: Deploy & Verify (MANDATORY)
 1. Commit with clear message including version number
 2. Push to master (triggers auto-deploy)
-3. Report to user:
-   - Version number (what was deployed)
+3. **VERIFY DEPLOYMENT** (wait 1-2 minutes, then):
+   ```bash
+   vercel ls  # Check most recent deployment status
+   vercel inspect [url]  # Get deployment details
+   ```
+   - Confirm status is "● Ready" (not "● Error")
+   - Verify deployment target is "Production"
+   - Check deployment created time is recent
+   - If deployment failed:
+     - Get logs: `gh run list` then `gh run view [id] --log`
+     - Investigate TypeScript/build errors
+     - Fix and redeploy
+     - DO NOT proceed until deployment succeeds
+4. Report to user:
+   - ✅ Deployment status (version X.X.X is live)
    - What was done
-   - What's now live
+   - What features are now available
    - Any follow-up needed
 
 ## Available Procedures

@@ -71,9 +71,16 @@
   - Set deployed_version to new version
   - Update metadata.current_version
 
-### 8. Deploy
+### 8. Deploy & Verify (MANDATORY)
 - Commit with performance metrics and version number
 - Push to master
+- **VERIFY DEPLOYMENT** (wait 1-2 minutes, then):
+  ```bash
+  vercel ls  # Check most recent deployment status
+  vercel inspect [url]  # Get deployment details
+  ```
+  - Confirm status is "● Ready" (not "● Error")
+  - If deployment failed, investigate logs and fix before proceeding
 - Monitor production performance
 - Verify improvements live
 
