@@ -42,6 +42,10 @@
     {
       "path": "/api/cron/linkedin-process",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/gmail-sync",
+      "schedule": "*/15 * * * *"
     }
   ]
 }

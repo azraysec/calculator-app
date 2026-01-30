@@ -15,6 +15,88 @@ datasource db {
 // CORE ENTITIES
 // ============================================================================
 
+/// User represents an authenticated user of the system.
+/// Owns data and has OAuth credentials for integrations.
+model User {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Identity
+  email String  @unique
+  name  String?
+
+  // Person association (migration from Person.metadata.isMe)
+  personId String? @unique
+  person   Person? @relation(fields: [personId], references: [id], onDelete: SetNull)
+
+  // OAuth tokens for integrations (encrypted at rest)
+  googleRefreshToken String? // Gmail OAuth refresh token
+  googleAccessToken  String? // Gmail OAuth access token
+  tokenExpiresAt     DateTime? // Token expiration timestamp
+
+  // Sync timestamps
+  lastGmailSyncAt DateTime? // Last time Gmail was synced
+
+  // Ownership relationships
+  ingestJobs     IngestJob[]
+  evidenceEvents EvidenceEvent[]
+  conversations  Conversation[]
+  messages       Message[]
+  people         Person[]        @relation("UserPeople") // People created/imported by this user
+
+  // NextAuth.js relationships
+  accounts Account[]
+  sessions Session[]
+
+  // Performance indexes
+  @@index([email])
+  @@map("users")
+}
+
+/// Account stores OAuth provider information (required by NextAuth.js)
+model Account {
+  id                String  @id @default(uuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+/// Session stores active user sessions (required by NextAuth.js)
+model Session {
+  id           String   @id @default(uuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+/// VerificationToken for email verification (required by NextAuth.js)
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
 /// Person represents an individual in the network.
 /// Supports entity resolution through arrays of names, emails, and phones.
 /// Includes merge tracking and GDPR-compliant soft deletes.
@@ -42,6 +124,13 @@ model Person {
   // Source-specific metadata
   // Structure: { linkedin: { profileUrl: "...", connections: 500 }, gmail: { ... } }
   metadata Json?
+
+  // Ownership (optional - for contacts imported by a specific user)
+  userId String?
+  user   User?   @relation("UserPeople", fields: [userId], references: [id], onDelete: SetNull)
+
+  // User association (reverse relation from User model)
+  owningUser User? @relation
 
   // Relationships
   outgoingEdges Edge[] @relation("FromPerson")
@@ -405,6 +494,10 @@ model EvidenceEvent {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Ownership (nullable during migration)
+  userId String? // User who owns this evidence
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   // Relationship this evidence supports
   subjectPersonId String // Primary person this evidence is about
   objectPersonId  String? // Optional counterparty (for interactions)
@@ -426,6 +519,7 @@ model EvidenceEvent {
   metadata Json?
 
   // Performance indexes
+  @@index([userId, timestamp])
   @@index([subjectPersonId, timestamp])
   @@index([objectPersonId, timestamp])
   @@index([type, timestamp])
@@ -438,6 +532,10 @@ model Conversation {
   id        String   @id @default(uuid())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Ownership (inbox owner - nullable during migration)
+  userId String? // User who owns this conversation
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // Source tracking
   externalId String // ID from source system (LinkedIn thread ID, Gmail thread ID)
@@ -455,6 +553,7 @@ model Conversation {
 
   @@unique([sourceName, externalId])
   // Performance indexes
+  @@index([userId])
   @@index([sourceName, externalId])
   @@index([participants])
   @@map("conversations")
@@ -464,6 +563,10 @@ model Conversation {
 model Message {
   id        String   @id @default(uuid())
   createdAt DateTime @default(now())
+
+  // Ownership (inbox owner - nullable during migration)
+  userId String? // User who owns this message
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // Message location
   conversationId String
@@ -481,6 +584,7 @@ model Message {
   metadata Json?
 
   // Performance indexes
+  @@index([userId])
   @@index([conversationId, timestamp])
   @@index([senderId, timestamp])
   @@map("messages")
@@ -492,8 +596,9 @@ model IngestJob {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Job details
-  userId     String // User who initiated the job
+  // Job details (nullable during migration)
+  userId     String? // User who initiated the job
+  user       User?           @relation(fields: [userId], references: [id], onDelete: Cascade)
   sourceName String // Data source: "linkedin_archive", "gmail", etc.
   status     IngestJobStatus @default(queued)
 
@@ -586,7 +691,7 @@ model ChangelogEntry {
   version String? // Version where this was completed (e.g., "0.8.1")
 
   // GitHub integration
-  githubIssueNumber Int?    // GitHub issue number (e.g., 5 for issue #5)
+  githubIssueNumber Int? // GitHub issue number (e.g., 5 for issue #5)
   githubIssueUrl    String? // Full GitHub issue URL
 
   // Performance indexes

@@ -6,33 +6,26 @@
  * Creates IngestJob record and stores file to Vercel Blob Storage
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { put } from '@vercel/blob';
 import { prisma } from '@/lib/prisma';
+import { withAuth } from '@/lib/auth-helpers';
 
 const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
 
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (request: Request, { userId }) => {
   try {
-    console.log('[LinkedIn Upload] Starting upload process');
+    console.log('[LinkedIn Upload] Starting upload process for user:', userId);
 
     // Parse multipart form data
     const formData = await request.formData();
     const file = formData.get('file') as File;
-    const userId = formData.get('userId') as string;
 
     console.log('[LinkedIn Upload] Received file:', file?.name, 'Size:', file?.size);
 
     if (!file) {
       return NextResponse.json(
         { error: 'No file provided' },
-        { status: 400 }
-      );
-    }
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'userId is required' },
         { status: 400 }
       );
     }
@@ -101,4 +94,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});

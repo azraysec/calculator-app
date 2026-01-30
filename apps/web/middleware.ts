@@ -3,6 +3,7 @@
  *
  * Runs on all requests before reaching route handlers.
  * Applies:
+ * - Authentication checks (redirects to login if not authenticated)
  * - Rate limiting to API routes
  * - CORS headers (if needed)
  * - Security headers
@@ -12,6 +13,7 @@
 
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { auth } from '@/lib/auth';
 
 /**
  * Rate limiting configuration
@@ -34,7 +36,34 @@ function getRateLimitKey(request: NextRequest): string {
   return 'anonymous';
 }
 
-export function middleware(request: NextRequest) {
+// eslint-disable-next-line
+export default auth(async (request: any) => {
+  const { pathname } = request.nextUrl;
+  const isLoggedIn = !!request.auth;
+
+  // Public routes that don't require authentication
+  const publicRoutes = [
+    '/login',
+    '/api/auth',
+    '/api/health',
+  ];
+
+  const isPublicRoute = publicRoutes.some((route) =>
+    pathname.startsWith(route)
+  );
+
+  // Redirect to login if not authenticated and trying to access protected route
+  if (!isLoggedIn && !isPublicRoute) {
+    const loginUrl = new URL('/login', request.url);
+    loginUrl.searchParams.set('callbackUrl', pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // Redirect to home if logged in and trying to access login page
+  if (isLoggedIn && pathname === '/login') {
+    return NextResponse.redirect(new URL('/', request.url));
+  }
+
   // Only apply rate limiting to API routes
   if (request.nextUrl.pathname.startsWith('/api')) {
     // Skip health checks from rate limiting
@@ -89,7 +118,7 @@ export function middleware(request: NextRequest) {
   }
 
   return NextResponse.next();
-}
+});
 
 /**
  * Configure which routes middleware runs on

@@ -87,6 +87,11 @@ export async function GET() {
 
     // Step 4: Parse archive
     console.log(`[Cron] Starting parse`);
+
+    if (!job.userId) {
+      throw new Error('IngestJob missing userId - cannot process');
+    }
+
     const parser = new LinkedInArchiveParser(
       prisma,
       job.userId,

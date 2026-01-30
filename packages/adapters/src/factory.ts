@@ -4,6 +4,7 @@
 
 import type { AdapterFactory, AdapterConfig, SourceAdapter } from '@wig/shared-types';
 import { MockAdapter, generateMockData } from './mock-adapter';
+import { GmailAdapter, type GmailConfig } from './gmail-adapter';
 
 export class AdapterFactoryImpl implements AdapterFactory {
   private adapters: Map<string, SourceAdapter> = new Map();
@@ -21,10 +22,16 @@ export class AdapterFactoryImpl implements AdapterFactory {
         adapter = new MockAdapter(generateMockData());
         break;
 
-      // TODO: Add Gmail adapter
-      // case 'gmail':
-      //   adapter = new GmailAdapter(config);
-      //   break;
+      case 'gmail':
+        if (!config.credentials || typeof config.credentials !== 'object') {
+          throw new Error('Gmail adapter requires credentials object');
+        }
+        const gmailCreds = config.credentials as Record<string, unknown>;
+        if (!gmailCreds.refreshToken || !gmailCreds.clientId || !gmailCreds.clientSecret) {
+          throw new Error('Gmail adapter requires refreshToken, clientId, and clientSecret in credentials');
+        }
+        adapter = new GmailAdapter(gmailCreds as unknown as GmailConfig);
+        break;
 
       // TODO: Add HubSpot adapter
       // case 'hubspot':
@@ -46,7 +53,7 @@ export class AdapterFactoryImpl implements AdapterFactory {
   }
 
   supports(sourceName: string): boolean {
-    return ['mock'].includes(sourceName);
+    return ['mock', 'gmail'].includes(sourceName);
     // TODO: Add more as implemented
     // return ['mock', 'gmail', 'hubspot', 'csv'].includes(sourceName);
   }

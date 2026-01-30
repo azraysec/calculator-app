@@ -2,12 +2,15 @@
  * Evidence API
  * GET /api/evidence?edgeIds=id1,id2,id3
  * Returns evidence events for specified edges
+ *
+ * PRIVACY: Only returns evidence owned by the authenticated user
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { prisma } from '@wig/db';
+import { withAuth } from '@/lib/auth-helpers';
 
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (request: Request, { userId }) => {
   try {
     const { searchParams } = new URL(request.url);
     const edgeIdsParam = searchParams.get('edgeIds');
@@ -47,11 +50,14 @@ export async function GET(request: NextRequest) {
     });
 
     // Fetch evidence events for these person pairs
+    // CRITICAL: Filter by userId to ensure privacy
     const edgeData = await Promise.all(
       edges.map(async (edge) => {
         // Get evidence events between these two people (bidirectional)
+        // Only return evidence owned by the authenticated user
         const evidence = await prisma.evidenceEvent.findMany({
           where: {
+            userId, // PRIVACY FILTER: Only user's own evidence
             OR: [
               {
                 subjectPersonId: edge.fromPersonId,
@@ -92,4 +98,4 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});

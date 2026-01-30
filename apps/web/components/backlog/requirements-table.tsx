@@ -402,6 +402,20 @@ const STATIC_REQUIREMENTS: Requirement[] = [
     dateStarted: '2026-01-30',
     dateCompleted: '2026-01-30',
   },
+  {
+    id: 'REQ-032',
+    requirement: 'Gmail integration with multi-user privacy controls',
+    priority: 'Critical',
+    status: 'Done',
+    category: 'Feature',
+    notes: 'Complete Gmail inbox integration with OAuth2 authentication and multi-tenancy. Migrated from single-user to multi-user architecture with User model, NextAuth.js authentication, user-scoped data filtering on all API routes. Created Gmail adapter for contacts and interactions sync. Automated 15-minute cron sync. Privacy-first: only metadata stored, full data isolation per user. 14 unit tests passing, comprehensive E2E test scaffolds. Database migration: 21,805 evidence events + 2,661 conversations migrated to user ownership.',
+    dateAdded: '2026-01-30',
+    dateStarted: '2026-01-30',
+    dateCompleted: '2026-01-30',
+    version: '0.12.0',
+    githubIssueNumber: 13,
+    githubIssueUrl: 'https://github.com/azraysec/calculator-app/issues/13',
+  },
 ];
 
 type SortField = keyof Requirement;

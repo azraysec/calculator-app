@@ -185,6 +185,10 @@ export const processLinkedInArchive = inngest.createFunction(
         throw new Error('Blob URL not found in job metadata');
       }
 
+      if (!job.userId) {
+        throw new Error('Job missing userId - cannot process');
+      }
+
       await prisma.ingestJob.update({
         where: { id: jobId },
         data: { progress: 5, logs: 'Downloading file from storage...' },
