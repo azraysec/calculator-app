@@ -29,7 +29,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { ArrowUpDown, ChevronLeft, ChevronRight, Search, X, GitBranch } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { PersonDetailView } from '@/components/people/person-detail-view';
+import { ArrowUpDown, ChevronLeft, ChevronRight, Search, X, GitBranch, Eye } from 'lucide-react';
 
 interface Connection {
   id: string;
@@ -81,6 +83,7 @@ export function ConnectionsGrid({ onFindPath }: ConnectionsGridProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [globalFilter, setGlobalFilter] = useState('');
+  const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
 
   // Column definitions
   const columns: ColumnDef<Connection>[] = [
@@ -228,7 +231,15 @@ export function ConnectionsGrid({ onFindPath }: ConnectionsGridProps) {
       id: 'actions',
       header: () => <div className="text-center">Actions</div>,
       cell: ({ row }) => (
-        <div className="text-center">
+        <div className="flex gap-2 justify-center">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setSelectedPersonId(row.original.id)}
+          >
+            <Eye className="h-4 w-4 mr-1" />
+            View
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -461,6 +472,21 @@ export function ConnectionsGrid({ onFindPath }: ConnectionsGridProps) {
           </div>
         </div>
       </Card>
+
+      {/* Person Detail Dialog */}
+      <Dialog open={selectedPersonId !== null} onOpenChange={(open) => !open && setSelectedPersonId(null)}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Person Details</DialogTitle>
+          </DialogHeader>
+          {selectedPersonId && (
+            <PersonDetailView
+              personId={selectedPersonId}
+              onClose={() => setSelectedPersonId(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
