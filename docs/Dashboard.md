@@ -19,49 +19,51 @@
 
 ---
 
-## Current Milestone: Multi-Tenant Comprehensive Testing
+## Current Milestone: Phase 2 - Core Domain Implementation
 
-### Completed
+### Phase 2 Planning Status: COMPLETE
 
-- **ALL previous milestones COMPLETE** (see history below)
-- **Prisma Edge Runtime Fix (v0.14.2):**
-  - Split auth configuration for Edge/Node.js compatibility
-  - Middleware uses simplified session cookie check (no JWT validation in Edge)
-  - API routes use full auth with PrismaAdapter
-  - Database session strategy working correctly
+Architecture Decision Record created and awaiting Chief Architect approval:
+- **ADR:** `docs/ArchitectureDecisions/2026-02-01-phase2-core-domain.md`
+- **Status:** AWAITING APPROVAL
 
-- **E2E Test Suite Improvements (Final):**
-  - Fixed authentication setup to work with database sessions
-  - Updated middleware to not try JWT decryption (database sessions use UUIDs)
-  - Fixed test assertions for correct UI element matching (strict mode violations)
-  - Changed `getByText('Data Sources')` to `getByRole('heading', { name: 'Data Sources' })`
-  - Fixed parallel test race condition by setting workers to 1
-  - Updated debug test to use baseURL instead of hardcoded vercel URL
-  - **Achieved 100% pass rate (83/83 tests)**
+### Phase 2 Scope (3 Weeks)
 
-### Test Results Summary
+**Week 1: Core Algorithms**
+- RelationshipScore and IntroductionPath schema migrations
+- Scoring algorithm (recency, frequency, bidirectional, channel diversity)
+- Pathfinding algorithm (BFS with scoring, max 3 hops)
+- API routes for path discovery
+- Comprehensive unit tests
 
-**Playwright E2E Tests (apps/web):**
-- Total: 83 tests
-- Passed: 83 tests (100%)
-- Failed: 0 tests (0%)
-- Pass Rate: 100%
+**Week 2: Data Source Adapters**
+- CSV Import Adapter (LinkedIn exports)
+- Gmail Adapter (OAuth2 + googleapis)
+- HubSpot Adapter (contacts + engagements)
+- Google Calendar Adapter (meeting attendees)
+- Integration tests for all adapters
 
-**Vitest Unit Tests (packages/adapters):**
-- Total: 44 tests
-- Passed: 43 tests
-- Skipped: 1 test
-- Pass Rate: 97.7%
+**Week 3: UI & Privacy**
+- Enhanced privacy controls (per-source settings)
+- Path visualization component
+- Evidence panel (interaction history)
+- Action panel (draft intro requests)
+- E2E tests for complete user journey
 
-### Issues Fixed
+### Phase 1 Completion Summary (v0.15.0)
 
-Root causes of the previous 14% pass rate (false report) were:
-1. **Parallel test race condition:** Workers read stale auth file before setup completed
-   - Fix: Set `workers: 1` in playwright.config.ts
-2. **Strict mode violations:** `getByText('Data Sources')` matched 3 elements
-   - Fix: Changed to `getByRole('heading', { name: 'Data Sources' })`
-3. **Hardcoded URL:** Debug test pointed to vercel.app instead of using baseURL
-   - Fix: Changed to `page.goto('/')`
+**Achieved:**
+- Multi-tenant architecture with userId isolation on all models
+- Database session authentication with NextAuth v5
+- Privacy controls UI with DataSourceConnection management
+- 100% E2E test pass rate (83/83 tests)
+- 97.7% unit test pass rate (43/44 tests)
+- Split auth config pattern for Edge/Node.js compatibility
+
+**Test Results (Final):**
+- E2E: 100% (83/83 passing)
+- Unit: 97.7% (43/44 passing)
+- All quality gates PASSED
 
 ---
 
