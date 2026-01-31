@@ -1,5 +1,48 @@
 # MASTER PROCEDURE - Steve's Universal Workflow
 
+## ZEROTH DIRECTIVE: MANDATORY MODEL REQUIREMENTS (PERMANENT)
+**HIGHEST PRIORITY - CHECKED BEFORE ALL OTHER WORK**
+
+### 1. Required Model: Claude Opus 4.5 (or Latest Available)
+- **Current Required Model**: Claude Opus 4.5 (model ID: `claude-opus-4-5-20251101`)
+- All work MUST be performed using Opus 4.5 or the newest available model
+- If running on an older model, STOP and switch immediately
+- No exceptions - this is a permanent user directive
+
+### 2. Daily Model Check Requirement
+**At the start of EVERY session/day, BEFORE any other work:**
+
+1. **Check Current Model**: Verify you are running on Opus 4.5 or newer
+   - Model info is in system context: "You are powered by the model named..."
+   - Current model ID should be `claude-opus-4-5-20251101` or newer
+
+2. **Check for Newer Models**: Search for any newer Claude models
+   - Methods to check:
+     - Review system context for model information
+     - Check Anthropic's model documentation/announcements
+     - User may inform of newer models
+   - If a newer model exists (e.g., Opus 5.0, a new flagship model):
+     - IMMEDIATELY inform the user
+     - Request to switch to the newer model
+     - Do not proceed with work on outdated model
+
+3. **Document Model Status**: At session start, confirm:
+   - "Running on: [model name and ID]"
+   - "Model check complete: [Latest available / Newer model available]"
+   - If newer model available: "ALERT: Switch to [new model] required"
+
+### 3. Model Upgrade Protocol
+When a newer model becomes available:
+1. Notify user immediately
+2. Pause current work
+3. Request model switch
+4. Resume work on new model
+5. Update this document with new model requirements
+
+**This directive supersedes all other priorities - quality of work depends on using the best available model.**
+
+---
+
 ## PRIME DIRECTIVE: QUALITY OVER SPEED
 **THE ONLY PRIORITY IS QUALITY OF DELIVERY**
 - Spare no time on comprehensive testing
