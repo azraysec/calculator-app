@@ -6,10 +6,11 @@
  * Requires LinkedIn API credentials to be configured
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createLinkedInAdapter } from '@wig/adapters';
 import { prisma } from '@/lib/prisma';
+import { withAuth } from '@/lib/auth-helpers';
 
 const requestSchema = z.object({
   url: z.string().url().optional(),
@@ -28,7 +29,7 @@ function extractVanityName(url: string): string | null {
   return match ? match[2] : null;
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (request: Request, { userId }) => {
   try {
     const body = await request.json();
     const validated = requestSchema.parse(body);
@@ -45,8 +46,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if person already exists in database
+    // CRITICAL: Filter by userId for multi-tenant isolation
     const existing = await prisma.person.findFirst({
       where: {
+        userId,
         deletedAt: null,
         socialHandles: {
           path: ['linkedin'],
@@ -122,4 +125,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});

@@ -3,9 +3,10 @@
  * GET /api/people?q=query
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
+import { withAuth } from '@/lib/auth-helpers';
 
 const searchSchema = z.object({
   q: z.string().min(1),
@@ -42,7 +43,7 @@ function calculateSimilarity(query: string, name: string): number {
   return 1 - distance / maxLength;
 }
 
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (request: Request, { userId }) => {
   try {
     const { searchParams } = new URL(request.url);
     const validated = searchSchema.parse({
@@ -53,8 +54,10 @@ export async function GET(request: NextRequest) {
 
     // First, get all people and filter for partial name matches
     // Prisma doesn't support partial matching in array fields, so we fetch and filter
+    // CRITICAL: Filter by userId for multi-tenant isolation
     const allPeople = await prisma.person.findMany({
       where: {
+        userId,
         deletedAt: null,
       },
       include: {
@@ -142,4 +145,4 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});

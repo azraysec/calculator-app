@@ -153,6 +153,7 @@ export async function POST(_request: NextRequest) {
             if (!person) {
               person = await prisma.person.create({
                 data: {
+                  userId: user.id,
                   names: [participant.split('@')[0]], // Use email username as name
                   emails: [participant],
                   phones: [],

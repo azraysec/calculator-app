@@ -5,13 +5,14 @@
  * Fetch all connections with filtering, sorting, and pagination
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { Prisma } from '@wig/db';
+import { withAuth } from '@/lib/auth-helpers';
 
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (request: Request, { userId }) => {
   try {
-    const searchParams = request.nextUrl.searchParams;
+    const { searchParams } = new URL(request.url);
 
     // Pagination
     const page = parseInt(searchParams.get('page') || '1');
@@ -29,7 +30,9 @@ export async function GET(request: NextRequest) {
     const companyFilter = searchParams.get('company');
 
     // Build where clause
+    // CRITICAL: Filter by userId for multi-tenant isolation
     const where: Prisma.PersonWhereInput = {
+      userId,
       deletedAt: null,
     };
 
@@ -160,4 +163,4 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});

@@ -3,19 +3,25 @@
  * GET /api/people/[id] - Fetch complete person data with all evidence
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { prisma } from '@wig/db';
+import { withAuth } from '@/lib/auth-helpers';
 
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export const GET = withAuth(async (
+  _request: Request,
+  { userId, params }
+) => {
   try {
     const { id } = await params;
 
     // Fetch person with all related data
-    const person = await prisma.person.findUnique({
-      where: { id, deletedAt: null },
+    // CRITICAL: Filter by userId for multi-tenant isolation
+    const person = await prisma.person.findFirst({
+      where: {
+        id,
+        userId,
+        deletedAt: null
+      },
       include: {
         organization: true,
         outgoingEdges: {
@@ -55,8 +61,10 @@ export async function GET(
     }
 
     // Fetch evidence events where this person is subject or object
+    // CRITICAL: Filter by userId for multi-tenant isolation
     const evidence = await prisma.evidenceEvent.findMany({
       where: {
+        userId,
         OR: [
           { subjectPersonId: id },
           { objectPersonId: id },
@@ -69,8 +77,10 @@ export async function GET(
     });
 
     // Get conversations involving this person
+    // CRITICAL: Filter by userId for multi-tenant isolation
     const conversations = await prisma.conversation.findMany({
       where: {
+        userId,
         participants: {
           has: id,
         },
@@ -185,4 +195,4 @@ export async function GET(
       { status: 500 }
     );
   }
-}
+});

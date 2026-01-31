@@ -5,12 +5,17 @@
 
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { withAuth } from '@/lib/auth-helpers';
 
-export async function GET() {
+export const GET = withAuth(async (_request: Request, { userId }) => {
   try {
     // Fetch all people (not deleted)
+    // CRITICAL: Filter by userId for multi-tenant isolation
     const people = await prisma.person.findMany({
-      where: { deletedAt: null },
+      where: {
+        userId,
+        deletedAt: null
+      },
       include: {
         organization: true,
       },
@@ -22,8 +27,14 @@ export async function GET() {
       return [];
     });
 
-    // Fetch all edges
+    // Fetch all edges between this user's people only
+    // CRITICAL: Filter edges to only connect user's own people
+    const personIds = people.map(p => p.id);
     const edges = await prisma.edge.findMany({
+      where: {
+        fromPersonId: { in: personIds },
+        toPersonId: { in: personIds },
+      },
       orderBy: {
         strength: 'desc',
       },
@@ -88,4 +99,4 @@ export async function GET() {
       { status: 500 }
     );
   }
-}
+});

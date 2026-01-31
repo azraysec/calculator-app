@@ -31,6 +31,18 @@ export async function POST(request: Request) {
 
     console.log('✓ Cleared existing data');
 
+    // Create or get default seed user
+    const seedUser = await prisma.user.upsert({
+      where: { email: 'seed@example.com' },
+      update: {},
+      create: {
+        email: 'seed@example.com',
+        name: 'Seed User',
+      },
+    });
+
+    console.log('✓ Created/found seed user:', seedUser.id);
+
     // Create organizations
     const startupCo = await prisma.organization.create({
       data: {
@@ -54,6 +66,7 @@ export async function POST(request: Request) {
       update: {},
       create: {
         id: 'me',
+        userId: seedUser.id,
         names: ['You', 'Your Name'],
         emails: ['you@example.com'],
         phones: ['+1-555-0100'],
@@ -64,6 +77,7 @@ export async function POST(request: Request) {
     // Create target person
     const jane = await prisma.person.create({
       data: {
+        userId: seedUser.id,
         names: ['Jane Doe'],
         emails: ['jane@bigcorp.com'],
         phones: ['+1-555-0104'],
@@ -75,6 +89,7 @@ export async function POST(request: Request) {
     // Create intermediary people
     const alice = await prisma.person.create({
       data: {
+        userId: seedUser.id,
         names: ['Alice Smith'],
         emails: ['alice@startup.com'],
         phones: ['+1-555-0101'],
@@ -85,6 +100,7 @@ export async function POST(request: Request) {
 
     const bob = await prisma.person.create({
       data: {
+        userId: seedUser.id,
         names: ['Bob Johnson'],
         emails: ['bob@bigcorp.com'],
         phones: ['+1-555-0102'],
@@ -95,6 +111,7 @@ export async function POST(request: Request) {
 
     const charlie = await prisma.person.create({
       data: {
+        userId: seedUser.id,
         names: ['Charlie Brown'],
         emails: ['charlie@startup.com'],
         phones: ['+1-555-0103'],

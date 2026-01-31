@@ -3,9 +3,10 @@
  * GET /api/people/:id/paths?target=targetId&maxHops=3&minStrength=0.3
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createGraphService } from '@/lib/graph-service';
 import { z } from 'zod';
+import { withAuth } from '@/lib/auth-helpers';
 
 const searchSchema = z.object({
   target: z.string().uuid(),
@@ -13,10 +14,10 @@ const searchSchema = z.object({
   minStrength: z.number().min(0).max(1).optional().default(0.3),
 });
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export const GET = withAuth(async (
+  request: Request,
+  { userId, params }
+) => {
   try {
     const { id } = await params;
     const { searchParams } = new URL(request.url);
@@ -31,7 +32,8 @@ export async function GET(
       minStrength: minStrength ? parseFloat(minStrength) : undefined,
     });
 
-    const graphService = createGraphService();
+    // CRITICAL: Pass userId for multi-tenant isolation
+    const graphService = createGraphService(userId);
     const result = await graphService.findPaths(id, validated.target, {
       maxHops: validated.maxHops,
       minStrength: validated.minStrength,
@@ -52,4 +54,4 @@ export async function GET(
       { status: 500 }
     );
   }
-}
+});
