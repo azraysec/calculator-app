@@ -15,6 +15,10 @@ import GoogleProvider from "next-auth/providers/google";
  * NextAuth v5 with Prisma:
  * - auth.config.ts: Edge-compatible config for middleware
  * - auth.ts: Full config with database adapter for API routes
+ *
+ * IMPORTANT: We use JWT strategy here because the middleware cannot access
+ * the database to validate session tokens. The auth.ts uses database strategy
+ * for full session management. The middleware only does basic route protection.
  */
 export const authConfig: NextAuthConfig = {
   secret: process.env.AUTH_SECRET,
@@ -43,6 +47,12 @@ export const authConfig: NextAuthConfig = {
   pages: {
     signIn: "/login",
     error: "/auth/error",
+  },
+
+  // Use JWT for middleware session checks (Edge runtime compatible)
+  // The full auth.ts uses database strategy with PrismaAdapter
+  session: {
+    strategy: "jwt",
   },
 
   callbacks: {

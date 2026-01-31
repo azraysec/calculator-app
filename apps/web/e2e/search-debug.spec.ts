@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test('debug search - check what renders', async ({ page }) => {
-  await page.goto('https://calculator-app-dun-chi.vercel.app');
+  await page.goto('/');
 
   // Wait for page to load
   await page.waitForLoadState('networkidle');

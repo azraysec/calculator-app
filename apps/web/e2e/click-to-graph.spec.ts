@@ -135,9 +135,9 @@ test.describe('Click-to-Graph Feature', () => {
         await findPathButton.click();
         await page.waitForTimeout(1000);
 
-        // Should navigate to Network tab
-        const networkTab = page.getByRole('tab', { name: 'Network' });
-        await expect(networkTab).toHaveAttribute('data-state', 'active');
+        // Should navigate to Intro Finder tab (where pathfinding happens)
+        const introFinderTab = page.getByRole('tab', { name: 'Intro Finder' });
+        await expect(introFinderTab).toHaveAttribute('data-state', 'active');
       }
     }
   });
@@ -158,9 +158,9 @@ test.describe('Click-to-Graph Feature', () => {
       await findPathButton.click();
       await page.waitForTimeout(1000);
 
-      // Should navigate to Network tab
-      const networkTab = page.getByRole('tab', { name: 'Network' });
-      await expect(networkTab).toHaveAttribute('data-state', 'active');
+      // Should navigate to Intro Finder tab (where pathfinding happens)
+      const introFinderTab = page.getByRole('tab', { name: 'Intro Finder' });
+      await expect(introFinderTab).toHaveAttribute('data-state', 'active');
     }
   });
 
@@ -195,9 +195,9 @@ test.describe('Click-to-Graph Feature', () => {
       await findPathButton.click();
       await page.waitForTimeout(1000);
 
-      // Should still work - navigate to Network tab
-      const networkTab = page.getByRole('tab', { name: 'Network' });
-      await expect(networkTab).toHaveAttribute('data-state', 'active');
+      // Should still work - navigate to Intro Finder tab
+      const introFinderTab = page.getByRole('tab', { name: 'Intro Finder' });
+      await expect(introFinderTab).toHaveAttribute('data-state', 'active');
     }
   });
 

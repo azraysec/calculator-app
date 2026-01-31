@@ -18,15 +18,15 @@ test.describe('Data Sources Page', () => {
   });
 
   test('should show all data source cards', async ({ page }) => {
-    // Check for LinkedIn card
-    await expect(page.getByRole('heading', { name: 'LinkedIn' })).toBeVisible();
+    // Check for LinkedIn card (use exact match to avoid matching "LinkedIn Upload History")
+    await expect(page.getByRole('heading', { name: 'LinkedIn', exact: true })).toBeVisible();
     await expect(page.getByText(/Import connections and messages/)).toBeVisible();
 
     // Check for other sources
-    await expect(page.getByRole('heading', { name: 'Gmail' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'HubSpot' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Google Calendar' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'CSV Import' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Gmail', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'HubSpot', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Google Calendar', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'CSV Import', exact: true })).toBeVisible();
   });
 
   test('should show sync health widget', async ({ page }) => {
@@ -115,6 +115,6 @@ test.describe('Navigation', () => {
 
     // Should show Data Sources content
     await expect(page.getByText('Sync Health')).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'LinkedIn' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'LinkedIn', exact: true })).toBeVisible();
   });
 });

@@ -22,12 +22,12 @@ import { GET } from './route';
 import { prisma } from '@wig/db';
 import * as authHelpers from '@/lib/auth-helpers';
 
-// Mock auth helper
+// Mock auth helper - use actual withAuth wrapper, only mock getAuthenticatedUserId
 vi.mock('@/lib/auth-helpers', async () => {
   const actual = await vi.importActual<typeof import('@/lib/auth-helpers')>('@/lib/auth-helpers');
   return {
-    ...actual,
-    getAuthenticatedUserId: vi.fn(),
+    ...actual, // Pass through withAuth, unauthorizedResponse, forbiddenResponse
+    getAuthenticatedUserId: vi.fn(), // Only mock the auth check
   };
 });
 

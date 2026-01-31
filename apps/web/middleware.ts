@@ -3,25 +3,25 @@
  *
  * Runs on all requests before reaching route handlers.
  * Applies:
- * - Authentication checks (redirects to login if not authenticated)
  * - Rate limiting to API routes
  * - CORS headers (if needed)
  * - Security headers
  *
  * IMPORTANT: Middleware runs on Edge Runtime, so Prisma Client is NOT available.
- * We use the edge-compatible auth configuration from auth.config.ts instead of
- * the full configuration from auth.ts.
  *
- * The edge-compatible config:
- * - Does NOT include PrismaAdapter
- * - Uses the `authorized` callback for middleware auth checks
- * - JWT strategy is used for session validation (not database)
+ * Authentication Strategy:
+ * - We do NOT validate sessions in middleware (Edge runtime cannot access database)
+ * - Authentication is handled by API routes using withAuth wrapper (Node.js runtime)
+ * - Public routes (login, health) are allowed through
+ * - Protected routes rely on API route authentication
+ * - Page routes check session on render (server components use full auth.ts)
+ *
+ * This approach avoids the JWT/database session mismatch that occurs when
+ * middleware tries to validate database sessions using JWT strategy.
  */
 
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import NextAuth from 'next-auth';
-import { authConfig } from '@/lib/auth.config';
 
 /**
  * Rate limiting configuration
@@ -44,46 +44,55 @@ function getRateLimitKey(request: NextRequest): string {
   return 'anonymous';
 }
 
-// Create edge-compatible auth instance (no Prisma adapter)
-const { auth } = NextAuth(authConfig);
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const authMiddleware = auth(async (request: any) => {
-  const { pathname } = request.nextUrl;
-  const isLoggedIn = !!request.auth;
-
-  // Note: Public route checking is now also handled by the `authorized` callback
-  // in auth.config.ts, but we keep the redirect logic here for proper UX
-
-  // Redirect to login if not authenticated and trying to access protected route
-  // (The authorized callback returns false, but we want a redirect, not a 401)
+/**
+ * Check if a route is public (no authentication required)
+ */
+function isPublicRoute(pathname: string): boolean {
   const publicRoutes = [
     '/login',
     '/api/auth',
     '/api/health',
+    '/auth/error',
   ];
-  const isPublicRoute = publicRoutes.some((route) =>
-    pathname.startsWith(route)
-  );
+  return publicRoutes.some((route) => pathname.startsWith(route));
+}
 
-  if (!isLoggedIn && !isPublicRoute) {
+export default async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // Skip static files and public routes
+  if (isPublicRoute(pathname)) {
+    return NextResponse.next();
+  }
+
+  // Check for session cookie to determine if user might be logged in
+  // We check for the database session cookie (authjs.session-token)
+  const sessionToken = request.cookies.get('authjs.session-token')?.value ||
+                       request.cookies.get('__Secure-authjs.session-token')?.value;
+
+  // If no session cookie and accessing protected page route, redirect to login
+  // Note: We can't validate the token here (Edge runtime), but we can check if it exists
+  // Actual validation happens in API routes (withAuth) and server components (auth())
+  if (!sessionToken && !pathname.startsWith('/api')) {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('callbackUrl', pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  // Redirect to home if logged in and trying to access login page
-  if (isLoggedIn && pathname === '/login') {
+  // If has session cookie and trying to access login page, redirect to home
+  if (sessionToken && pathname === '/login') {
     return NextResponse.redirect(new URL('/', request.url));
   }
 
-  // Only apply rate limiting to API routes
-  if (request.nextUrl.pathname.startsWith('/api')) {
+  // Apply rate limiting to API routes only
+  if (pathname.startsWith('/api')) {
     // Skip health checks from rate limiting
-    if (
-      request.nextUrl.pathname === '/api/health' ||
-      request.nextUrl.pathname === '/api/health/ready'
-    ) {
+    if (pathname === '/api/health' || pathname === '/api/health/ready') {
+      return NextResponse.next();
+    }
+
+    // Skip auth routes from rate limiting (handled by NextAuth)
+    if (pathname.startsWith('/api/auth')) {
       return NextResponse.next();
     }
 
@@ -131,11 +140,7 @@ const authMiddleware = auth(async (request: any) => {
   }
 
   return NextResponse.next();
-}) as unknown;
-
-// Type assertion to satisfy Next.js module type inference
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export default authMiddleware as any;
+}
 
 /**
  * Configure which routes middleware runs on

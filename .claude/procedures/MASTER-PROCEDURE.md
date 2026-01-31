@@ -154,12 +154,30 @@ After completing ANY step of ANY process, execute the **FULL MULTI-LAYERED TESTI
 3. Use TaskCreate to track all subtasks
 4. Delegate to specialized agents
 5. Monitor progress
-6. **Status Reports** (MANDATORY):
-   - Provide status update EVERY 10 MINUTES
-   - Include: timestamp (date + time), current task, progress, blockers, test status
-   - Format: "## Status Report - [YYYY-MM-DD HH:MM]"
+6. **Status Reports** (MANDATORY - ENFORCED):
+
+   ⚠️ **CRITICAL: 10-MINUTE REPORTING REQUIREMENT** ⚠️
+
+   - **MANDATORY**: Provide status update EVERY 10 MINUTES without exception
+   - Set a mental timer - if 10 minutes pass, STOP current work and report
+   - Reports are NON-NEGOTIABLE even during complex debugging or implementation
+   - If a task takes longer than 10 minutes, report progress mid-task
+
+   **Report Format:**
+   ```
+   ## Status Report - [YYYY-MM-DD HH:MM]
+
+   **Time Elapsed:** [X] minutes since last report
+   **Current Task:** [What you're working on]
+   **Progress:** [Percentage or milestone]
+   **Blockers:** [Any issues] or None
+   **Test Status:** [Layer X of 8, X% passing]
+   **Next Steps:** [What will happen in next 10 min]
+   ```
+
    - Include current testing layer and coverage metrics
    - Never stop to ask if should continue - ALWAYS continue with next priority
+   - **Failure to report every 10 minutes is a procedure violation**
 
 ## Phase 3: Final Quality Gate (MANDATORY)
 Note: Comprehensive multi-layered tests have been run after each step. This is a final integration check.

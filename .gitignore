@@ -33,6 +33,9 @@ build/
 # Testing
 coverage/
 .nyc_output/
+playwright/.auth/
+test-results/
+playwright-report/
 
 # Misc
 *.tsbuildinfo
