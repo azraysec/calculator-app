@@ -1,10 +1,18 @@
-import NextAuth, { NextAuthConfig } from "next-auth";
+import NextAuth from "next-auth";
 import { PrismaAdapter } from "@auth/prisma-adapter";
-import GoogleProvider from "next-auth/providers/google";
 import { prisma } from "@wig/db";
+import { authConfig } from "./auth.config";
 
 /**
  * NextAuth.js configuration for authentication
+ *
+ * This is the FULL configuration with Prisma adapter, used by:
+ * - API routes (Node.js runtime)
+ * - Server components (Node.js runtime)
+ * - Server actions (Node.js runtime)
+ *
+ * For Edge Runtime (middleware), use auth.config.ts which does NOT
+ * include the Prisma adapter.
  *
  * Provides:
  * - Google OAuth for user authentication
@@ -12,35 +20,16 @@ import { prisma } from "@wig/db";
  * - User session management
  * - Prisma database integration
  */
-export const authConfig: NextAuthConfig = {
+const fullAuthConfig = {
+  ...authConfig,
   adapter: PrismaAdapter(prisma),
 
-  providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      authorization: {
-        params: {
-          // Request offline access to get refresh token
-          access_type: "offline",
-          prompt: "consent",
-          // Gmail API scopes
-          scope: [
-            "openid",
-            "email",
-            "profile",
-            "https://www.googleapis.com/auth/gmail.readonly",
-          ].join(" "),
-        },
-      },
-    }),
-  ],
-
   callbacks: {
+    ...authConfig.callbacks,
     /**
      * Store OAuth tokens in User model for API access
      */
-    async signIn({ account, profile }) {
+    async signIn({ account, profile }: { account: any; profile?: any }) {
       if (account?.provider === "google" && account.refresh_token && profile?.email) {
         // Update user with Google OAuth tokens
         await prisma.user.update({
@@ -60,7 +49,7 @@ export const authConfig: NextAuthConfig = {
     /**
      * Add user ID to session for API route authorization
      */
-    async session({ session, user }) {
+    async session({ session, user }: { session: any; user: any }) {
       if (session.user) {
         session.user.id = user.id;
       }
@@ -70,7 +59,7 @@ export const authConfig: NextAuthConfig = {
     /**
      * Add user ID to JWT token
      */
-    async jwt({ token, user }) {
+    async jwt({ token, user }: { token: any; user?: any }) {
       if (user) {
         token.id = user.id;
       }
@@ -78,13 +67,8 @@ export const authConfig: NextAuthConfig = {
     },
   },
 
-  pages: {
-    signIn: "/login",
-    error: "/auth/error",
-  },
-
   session: {
-    strategy: "database",
+    strategy: "database" as const,
   },
 
   debug: process.env.NODE_ENV === "development",
@@ -93,9 +77,12 @@ export const authConfig: NextAuthConfig = {
 /**
  * NextAuth.js instance with helpers
  * Use auth() in server components and API routes to get session
+ *
+ * Note: This uses the FULL configuration with Prisma adapter.
+ * The middleware uses a separate instance with the edge-compatible config.
  */
 // eslint-disable-next-line
-const nextAuth: any = NextAuth(authConfig);
+const nextAuth: any = NextAuth(fullAuthConfig);
 
 export const handlers = nextAuth.handlers;
 export const auth = nextAuth.auth;

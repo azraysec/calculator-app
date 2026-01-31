@@ -8,12 +8,20 @@
  * - CORS headers (if needed)
  * - Security headers
  *
- * Note: Middleware runs on Edge Runtime, so some Node.js APIs are unavailable.
+ * IMPORTANT: Middleware runs on Edge Runtime, so Prisma Client is NOT available.
+ * We use the edge-compatible auth configuration from auth.config.ts instead of
+ * the full configuration from auth.ts.
+ *
+ * The edge-compatible config:
+ * - Does NOT include PrismaAdapter
+ * - Uses the `authorized` callback for middleware auth checks
+ * - JWT strategy is used for session validation (not database)
  */
 
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { auth } from '@/lib/auth';
+import NextAuth from 'next-auth';
+import { authConfig } from '@/lib/auth.config';
 
 /**
  * Rate limiting configuration
@@ -36,23 +44,28 @@ function getRateLimitKey(request: NextRequest): string {
   return 'anonymous';
 }
 
-// eslint-disable-next-line
-export default auth(async (request: any) => {
+// Create edge-compatible auth instance (no Prisma adapter)
+const { auth } = NextAuth(authConfig);
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const authMiddleware = auth(async (request: any) => {
   const { pathname } = request.nextUrl;
   const isLoggedIn = !!request.auth;
 
-  // Public routes that don't require authentication
+  // Note: Public route checking is now also handled by the `authorized` callback
+  // in auth.config.ts, but we keep the redirect logic here for proper UX
+
+  // Redirect to login if not authenticated and trying to access protected route
+  // (The authorized callback returns false, but we want a redirect, not a 401)
   const publicRoutes = [
     '/login',
     '/api/auth',
     '/api/health',
   ];
-
   const isPublicRoute = publicRoutes.some((route) =>
     pathname.startsWith(route)
   );
 
-  // Redirect to login if not authenticated and trying to access protected route
   if (!isLoggedIn && !isPublicRoute) {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('callbackUrl', pathname);
@@ -118,7 +131,11 @@ export default auth(async (request: any) => {
   }
 
   return NextResponse.next();
-});
+}) as unknown;
+
+// Type assertion to satisfy Next.js module type inference
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export default authMiddleware as any;
 
 /**
  * Configure which routes middleware runs on
