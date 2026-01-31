@@ -39,11 +39,12 @@ model User {
   lastGmailSyncAt DateTime? // Last time Gmail was synced
 
   // Ownership relationships
-  ingestJobs     IngestJob[]
-  evidenceEvents EvidenceEvent[]
-  conversations  Conversation[]
-  messages       Message[]
-  people         Person[]        @relation("UserPeople") // People created/imported by this user
+  ingestJobs         IngestJob[]
+  evidenceEvents     EvidenceEvent[]
+  conversations      Conversation[]
+  messages           Message[]
+  people             Person[]              @relation("UserPeople") // People created/imported by this user
+  dataConnections    DataSourceConnection[] // User's connected data sources
 
   // NextAuth.js relationships
   accounts Account[]
@@ -97,6 +98,42 @@ model VerificationToken {
   @@map("verification_tokens")
 }
 
+/// DataSourceConnection represents a user's connection to an external data source.
+/// Manages authentication, sync status, and privacy settings for each integration.
+model DataSourceConnection {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Ownership
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Data source details
+  sourceType       DataSourceType    // Type of data source (LinkedIn, Facebook, etc.)
+  connectionStatus ConnectionStatus  // Current connection state
+
+  // Authentication data (should be encrypted at rest)
+  authData String? // Encrypted JSON with OAuth tokens/credentials
+
+  // Source metadata
+  // Structure: { profileUrl: "...", displayName: "...", connectionCount: 500, lastSyncStats: {...} }
+  metadata Json?
+
+  // Privacy settings
+  privacyLevel PrivacyLevel @default(PRIVATE) // Data visibility level
+
+  // Sync tracking
+  lastSyncedAt DateTime? // Last successful sync from this source
+
+  @@unique([userId, sourceType]) // One connection per source type per user
+  // Performance indexes
+  @@index([userId])
+  @@index([userId, sourceType])
+  @@index([connectionStatus])
+  @@map("data_source_connections")
+}
+
 /// Person represents an individual in the network.
 /// Supports entity resolution through arrays of names, emails, and phones.
 /// Includes merge tracking and GDPR-compliant soft deletes.
@@ -125,9 +162,9 @@ model Person {
   // Structure: { linkedin: { profileUrl: "...", connections: 500 }, gmail: { ... } }
   metadata Json?
 
-  // Ownership (optional - for contacts imported by a specific user)
-  userId String?
-  user   User?   @relation("UserPeople", fields: [userId], references: [id], onDelete: SetNull)
+  // Ownership (required - every person belongs to a user)
+  userId String
+  user   User   @relation("UserPeople", fields: [userId], references: [id], onDelete: Cascade)
 
   // User association (reverse relation from User model)
   owningUser User? @relation
@@ -145,6 +182,9 @@ model Person {
   tasks Task[]
 
   // Performance indexes
+  @@index([userId]) // Multi-tenant queries
+  @@index([userId, emails]) // Fast lookup by email within user context
+  @@index([userId, phones]) // Fast lookup by phone within user context
   @@index([deletedAt]) // Filter out soft-deleted records
   @@index([emails]) // Fast lookup by email
   @@index([phones]) // Fast lookup by phone
@@ -483,6 +523,28 @@ enum TaskPriority {
   high
 }
 
+enum DataSourceType {
+  LINKEDIN
+  FACEBOOK
+  EMAIL
+  TWITTER
+  GITHUB
+  CALENDAR
+}
+
+enum ConnectionStatus {
+  CONNECTED
+  DISCONNECTED
+  ERROR
+  PENDING
+}
+
+enum PrivacyLevel {
+  PRIVATE           // Only visible to owner
+  CONNECTIONS_ONLY  // Visible to direct connections (future feature)
+  PUBLIC            // Visible to all users (future feature)
+}
+
 // ============================================================================
 // EVIDENCE & LINKEDIN INTEGRATION
 // ============================================================================
@@ -494,9 +556,9 @@ model EvidenceEvent {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Ownership (nullable during migration)
-  userId String? // User who owns this evidence
-  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Ownership (required - every evidence belongs to a user)
+  userId String // User who owns this evidence
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // Relationship this evidence supports
   subjectPersonId String // Primary person this evidence is about
@@ -533,9 +595,9 @@ model Conversation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Ownership (inbox owner - nullable during migration)
-  userId String? // User who owns this conversation
-  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Ownership (inbox owner - required)
+  userId String // User who owns this conversation
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // Source tracking
   externalId String // ID from source system (LinkedIn thread ID, Gmail thread ID)
@@ -564,9 +626,9 @@ model Message {
   id        String   @id @default(uuid())
   createdAt DateTime @default(now())
 
-  // Ownership (inbox owner - nullable during migration)
-  userId String? // User who owns this message
-  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Ownership (inbox owner - required)
+  userId String // User who owns this message
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // Message location
   conversationId String
@@ -596,9 +658,9 @@ model IngestJob {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Job details (nullable during migration)
-  userId     String? // User who initiated the job
-  user       User?           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Job details (required - every job belongs to a user)
+  userId     String // User who initiated the job
+  user       User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   sourceName String // Data source: "linkedin_archive", "gmail", etc.
   status     IngestJobStatus @default(queued)
 

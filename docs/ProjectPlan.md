@@ -21,13 +21,56 @@
 
 ---
 
-## Phase 2: Core Domain (Days 4-7)
+## Phase 1b: Multi-Tenant Architecture (Days 4-6)
+**Status:** 🟡 In Progress
+**Owner:** Postgres Pro + DevOps Release + Manager
+
+| Task | Status | Owner | Dependencies | Notes |
+|------|--------|-------|--------------|-------|
+| Architecture Decision Record | ✅ Done | Manager | None | ADR-20260131 created |
+| Create User model migration | ✅ Done | Postgres Pro | ADR approval | User already existed |
+| Create DataSourceConnection model | ✅ Done | Postgres Pro | User model | LinkedIn, Facebook, Email support |
+| Add userId to Person model | ✅ Done | Postgres Pro | User model | Foreign key + indexes + NOT NULL |
+| Add userId to EvidenceEvent model | ✅ Done | Postgres Pro | User model | Foreign key + indexes + NOT NULL |
+| Add userId to Conversation model | ✅ Done | Postgres Pro | User model | Foreign key + indexes + NOT NULL |
+| Add userId to Message model | ✅ Done | Postgres Pro | User model | Foreign key + indexes + NOT NULL |
+| Add userId to IngestJob model | ✅ Done | Postgres Pro | User model | Foreign key + indexes + NOT NULL |
+| Create enums (DataSourceType, etc.) | ✅ Done | Postgres Pro | Schema changes | All enums created |
+| Migrate existing data to default user | ✅ Done | DevOps Release | Schema changes | All records have userId |
+| Test migration on dev database | ✅ Done | Postgres Pro | Migration applied | Verified successfully |
+| Update Prisma client | ✅ Done | DevOps Release | Migration tested | Generated v5.22.0 |
+
+## Phase 1c: Backend Multi-Tenant Isolation (Days 7-8)
+**Status:** 🟡 Ready to Start
+**Owner:** Adapter Engineer + Graph Intelligence
+
+| Task | Status | Owner | Dependencies | Notes |
+|------|--------|-------|--------------|-------|
+| Add userId context to repositories | 🟡 Ready | Adapter Engineer | Phase 1b ✅ | Filter all queries by userId |
+| Create auth middleware | 🟡 Ready | DevOps Release | Phase 1b ✅ | Inject userId from session |
+| Update adapter interfaces | 🟡 Ready | Adapter Engineer | Middleware | Accept userId parameter |
+| Add tenant isolation tests | ⏳ Pending | QA Test Engineer | Repository updates | Verify no cross-tenant leaks |
+| Update graph algorithms | ⏳ Pending | Graph Intelligence | Repository updates | Respect userId boundaries |
+
+## Phase 1d: Frontend User Context (Days 9-10)
+**Status:** ⏳ Not Started
+**Owner:** Frontend Developer + React Specialist
+
+| Task | Status | Owner | Dependencies | Notes |
+|------|--------|-------|--------------|-------|
+| Add user session context | ⏳ Pending | React Specialist | Phase 1c | React Context provider |
+| Update API calls with user context | ⏳ Pending | Frontend Developer | Session context | Include userId in requests |
+| Add user profile UI | ⏳ Pending | UI Designer | Session context | View/edit privacy settings |
+| Add DataSourceConnection UI | ⏳ Pending | Frontend Developer | Profile UI | Manage LinkedIn connection |
+| Privacy controls UI | ⏳ Pending | UI Designer | DataSource UI | Privacy level selector |
+
+## Phase 2: Core Domain (Days 11-14)
 **Status:** ⏳ Not Started
 **Owner:** Graph Intelligence + Adapter Engineer
 
 | Task | Status | Owner | Dependencies | Notes |
 |------|--------|-------|--------------|-------|
-| Design Prisma schema | ⏳ Pending | Postgres Pro | Architect approval | Person, Org, Interaction, Edge |
+| Design Prisma schema extensions | ⏳ Pending | Postgres Pro | Phase 1 complete | Org, Interaction, Edge models |
 | Implement generic adapter interface | ⏳ Pending | Adapter Engineer | Schema | TypeScript interfaces |
 | Build MockAdapter with fixtures | ⏳ Pending | Adapter Engineer | Interface | For testing without APIs |
 | Implement relationship scoring | ⏳ Pending | Graph Intelligence | Schema | Recency, frequency, channel weights |

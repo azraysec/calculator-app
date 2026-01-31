@@ -1,12 +1,12 @@
 # WIG Project Dashboard
 
-**Last Updated:** 2026-01-17 (Evening Update)
-**Current Phase:** Foundation (Phase 1) → **COMPLETE** ✅
-**Status:** 🟢 Ready for Phase 2
+**Last Updated:** 2026-01-31
+**Current Phase:** Multi-Tenant Architecture Implementation
+**Status:** 🟡 In Progress - Phase 1: Database Migration
 
 ---
 
-## Current Milestone: Phase 1 Implementation - Foundation
+## Current Milestone: Multi-Tenant Architecture Implementation
 
 ### Completed ✅
 - ✅ PRD analysis and requirements breakdown
@@ -23,9 +23,21 @@
 - ✅ React Flow scalability documentation (500-node boundary)
 - ✅ **ALL Chief Architect conditions satisfied**
 - ✅ Persistent knowledge base system (`.claude/knowledge/`)
+- ✅ **Multi-tenant architecture decision** (ADR-20260131)
+- ✅ **Phase 1: Database migration complete**
+  - ✅ DataSourceConnection model created
+  - ✅ New enums: DataSourceType, ConnectionStatus, PrivacyLevel
+  - ✅ userId enforced as NOT NULL on Person, EvidenceEvent, Conversation, Message, IngestJob
+  - ✅ Foreign key constraints updated to CASCADE delete
+  - ✅ Multi-tenant indexes created
+  - ✅ Existing data migrated to default user
+  - ✅ Prisma client regenerated
 
 ### In Progress 🟡
-- 🟡 Phase 1 complete, ready to begin Phase 2 (Core Domain)
+- 🟡 Phase 2: Backend logic isolation for multi-tenant architecture
+  - Need to update repository methods to filter by userId
+  - Need to add auth middleware to inject userId from session
+  - Need to update adapter interfaces to accept userId parameter
 
 ### Blocked ⛔
 - None currently
@@ -36,6 +48,8 @@
 1. ✅ **Tech Stack:** Next.js 14+ + LangGraph.js + Prisma + Inngest (APPROVED)
 2. ✅ **Database provider:** Neon Postgres (serverless-native)
 3. ✅ **Graph visualization library:** React Flow for MVP (500-node boundary documented)
+4. ✅ **Multi-tenant architecture:** DataSourceConnection model with per-user data isolation (ADR-20260131)
+5. ✅ **Privacy model:** Default PRIVATE, all-or-nothing sharing for MVP, no cross-user intros
 
 ---
 
@@ -50,10 +64,11 @@
 
 ---
 
-## Next 3 Tasks (High Priority - Phase 2)
-1. Set up Neon Postgres with connection pooling
-2. Implement generic adapter interface in packages/adapters
-3. Build MockAdapter with test fixtures
+## Next 3 Tasks (High Priority - Multi-Tenant Phase 1)
+1. Create Prisma migration for User and DataSourceConnection models
+2. Add userId foreign keys to existing models with indexes
+3. Create seed script to migrate existing data to default user
+4. Update Prisma schema and regenerate client
 
 ## Chief Architect Conditions to Address
 - [x] Create packages/shared-types package
