@@ -176,6 +176,7 @@ export class LinkedInArchiveParser {
         // Create the user's Person record if it doesn't exist
         mePerson = await this.prisma.person.create({
           data: {
+            userId: this.userId,
             names: [this.userId], // Temporary name, user can update later
             emails: [this.userId],
             metadata: {
@@ -232,6 +233,7 @@ export class LinkedInArchiveParser {
           // Create evidence event
           await this.prisma.evidenceEvent.create({
             data: {
+              userId: this.userId,
               subjectPersonId: mePerson.id,
               objectPersonId: person.person.id,
               type: 'linkedin_connection',
@@ -312,6 +314,7 @@ export class LinkedInArchiveParser {
         // Create the user's Person record if it doesn't exist
         mePerson = await this.prisma.person.create({
           data: {
+            userId: this.userId,
             names: [this.userId], // Temporary name, user can update later
             emails: [this.userId],
             metadata: {
@@ -356,6 +359,7 @@ export class LinkedInArchiveParser {
               },
             },
             create: {
+              userId: this.userId,
               externalId: conversationId,
               sourceName: 'linkedin',
               participants: Array.from(participantNames),
@@ -410,6 +414,7 @@ export class LinkedInArchiveParser {
               // Create new person for message participant
               otherPerson = await this.prisma.person.create({
                 data: {
+                  userId: this.userId,
                   names: [otherPersonName],
                   emails: [],
                   metadata: {
@@ -437,6 +442,7 @@ export class LinkedInArchiveParser {
             // Create evidence event
             await this.prisma.evidenceEvent.create({
               data: {
+                userId: this.userId,
                 subjectPersonId: isSentByMe ? mePerson.id : otherPerson.id,
                 objectPersonId: isSentByMe ? otherPerson.id : mePerson.id,
                 type: isSentByMe ? 'linkedin_message_sent' : 'linkedin_message_received',
@@ -523,6 +529,7 @@ export class LinkedInArchiveParser {
     // Create new person only if not found by email or name
     const person = await this.prisma.person.create({
       data: {
+        userId: this.userId,
         names: data.names,
         emails: data.emails,
         title: data.title,
