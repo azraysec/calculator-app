@@ -14,7 +14,7 @@ import * as authHelpers from '@/lib/auth-helpers';
 
 // Mock auth helper
 vi.mock('@/lib/auth-helpers', async () => {
-  const actual = await vi.importActual('@/lib/auth-helpers');
+  const actual = await vi.importActual<typeof import('@/lib/auth-helpers')>('@/lib/auth-helpers');
   return {
     ...actual,
     getAuthenticatedUserId: vi.fn(),
