@@ -31,10 +31,20 @@ const fullAuthConfig = {
      */
     async signIn({ account, profile }: { account: any; profile?: any }) {
       if (account?.provider === "google" && account.refresh_token && profile?.email) {
-        // Update user with Google OAuth tokens
-        await prisma.user.update({
+        // Store Google OAuth tokens for Gmail API access
+        // Use upsert in case user is being created during this sign-in
+        await prisma.user.upsert({
           where: { email: profile.email },
-          data: {
+          update: {
+            googleRefreshToken: account.refresh_token,
+            googleAccessToken: account.access_token ?? null,
+            tokenExpiresAt: account.expires_at
+              ? new Date(account.expires_at * 1000)
+              : null,
+          },
+          create: {
+            email: profile.email,
+            name: profile.name ?? null,
             googleRefreshToken: account.refresh_token,
             googleAccessToken: account.access_token ?? null,
             tokenExpiresAt: account.expires_at
