@@ -27,6 +27,9 @@ export const authConfig: NextAuthConfig = {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      // Allow linking Google account to existing user with same email
+      // This is safe because Google verifies email ownership
+      allowDangerousEmailAccountLinking: true,
       authorization: {
         params: {
           // Request offline access to get refresh token
