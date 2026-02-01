@@ -27,32 +27,13 @@ const fullAuthConfig = {
   callbacks: {
     ...authConfig.callbacks,
     /**
-     * Store OAuth tokens in User model for API access
+     * signIn callback - runs BEFORE user is created by adapter
+     * DO NOT create/upsert users here - it conflicts with PrismaAdapter
+     * Just validate and return true to allow sign-in
      */
-    async signIn({ account, profile }: { account: any; profile?: any }) {
-      if (account?.provider === "google" && account.refresh_token && profile?.email) {
-        // Store Google OAuth tokens for Gmail API access
-        // Use upsert in case user is being created during this sign-in
-        await prisma.user.upsert({
-          where: { email: profile.email },
-          update: {
-            googleRefreshToken: account.refresh_token,
-            googleAccessToken: account.access_token ?? null,
-            tokenExpiresAt: account.expires_at
-              ? new Date(account.expires_at * 1000)
-              : null,
-          },
-          create: {
-            email: profile.email,
-            name: profile.name ?? null,
-            googleRefreshToken: account.refresh_token,
-            googleAccessToken: account.access_token ?? null,
-            tokenExpiresAt: account.expires_at
-              ? new Date(account.expires_at * 1000)
-              : null,
-          },
-        });
-      }
+    async signIn() {
+      // Allow all Google sign-ins
+      // Token storage happens in events.signIn AFTER user exists
       return true;
     },
 
@@ -74,6 +55,36 @@ const fullAuthConfig = {
         token.id = user.id;
       }
       return token;
+    },
+  },
+
+  /**
+   * Events fire AFTER the adapter operations complete
+   * Safe to update user here because they definitely exist
+   */
+  events: {
+    /**
+     * Store OAuth tokens in User model for Gmail API access
+     * This runs AFTER PrismaAdapter creates/links the user
+     */
+    async signIn({ user, account }: { user: any; account: any }) {
+      if (account?.provider === "google" && account.refresh_token && user?.id) {
+        try {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: {
+              googleRefreshToken: account.refresh_token,
+              googleAccessToken: account.access_token ?? null,
+              tokenExpiresAt: account.expires_at
+                ? new Date(account.expires_at * 1000)
+                : null,
+            },
+          });
+        } catch (error) {
+          // Log but don't fail sign-in if token storage fails
+          console.error("Failed to store OAuth tokens:", error);
+        }
+      }
     },
   },
 
