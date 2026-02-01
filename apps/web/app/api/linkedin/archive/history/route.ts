@@ -2,16 +2,19 @@
  * LinkedIn Archive Upload History API
  * GET /api/linkedin/archive/history
  *
- * Returns history of all LinkedIn archive uploads with statistics
+ * Returns history of LinkedIn archive uploads for the authenticated user
  */
 
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { withAuth } from '@/lib/auth-helpers';
 
-export async function GET() {
+export const GET = withAuth(async (_request: Request, { userId }) => {
   try {
+    // Filter by userId for multi-tenant isolation
     const jobs = await prisma.ingestJob.findMany({
       where: {
+        userId,
         sourceName: 'linkedin_archive',
       },
       orderBy: {
@@ -89,4 +92,4 @@ export async function GET() {
       { status: 500 }
     );
   }
-}
+});

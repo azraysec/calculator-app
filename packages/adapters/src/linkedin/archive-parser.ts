@@ -29,6 +29,7 @@ export interface ParserResult {
 export class LinkedInArchiveParser {
   private prisma: PrismaClient;
   private userId: string;
+  private userEmail: string | null = null;
   private onProgress?: (progress: ParserProgress) => void;
 
   constructor(
@@ -39,6 +40,17 @@ export class LinkedInArchiveParser {
     this.prisma = prisma;
     this.userId = userId;
     this.onProgress = onProgress;
+  }
+
+  /**
+   * Initialize user email from database
+   */
+  private async initUserEmail(): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: this.userId },
+      select: { email: true },
+    });
+    this.userEmail = user?.email || null;
   }
 
   /**
@@ -58,6 +70,9 @@ export class LinkedInArchiveParser {
     };
 
     try {
+      // Initialize user email for "me" person creation
+      await this.initUserEmail();
+
       // Extract ZIP
       this.reportProgress('extracting', 10, 'Extracting archive...');
       const zip = new AdmZip(filePath);
@@ -164,21 +179,26 @@ export class LinkedInArchiveParser {
         console.log('[Parser] First connection record sample:', JSON.stringify(records[0]).substring(0, 200));
       }
 
-      // Get or create "me" person
+      // Get or create "me" person for this user
       let mePerson = await this.prisma.person.findFirst({
         where: {
-          emails: { has: this.userId },
+          userId: this.userId,
+          metadata: {
+            path: ['isMe'],
+            equals: true,
+          },
           deletedAt: null,
         },
       });
 
       if (!mePerson) {
         // Create the user's Person record if it doesn't exist
+        const userName = this.userEmail?.split('@')[0] || 'Me';
         mePerson = await this.prisma.person.create({
           data: {
             userId: this.userId,
-            names: [this.userId], // Temporary name, user can update later
-            emails: [this.userId],
+            names: [userName],
+            emails: this.userEmail ? [this.userEmail] : [],
             metadata: {
               isMe: true,
               source: 'linkedin_archive',
@@ -302,21 +322,26 @@ export class LinkedInArchiveParser {
         relax_column_count: true,
       }) as Array<Record<string, string>>;
 
-      // Get or create "me" person
+      // Get or create "me" person for this user
       let mePerson = await this.prisma.person.findFirst({
         where: {
-          emails: { has: this.userId },
+          userId: this.userId,
+          metadata: {
+            path: ['isMe'],
+            equals: true,
+          },
           deletedAt: null,
         },
       });
 
       if (!mePerson) {
         // Create the user's Person record if it doesn't exist
+        const userName = this.userEmail?.split('@')[0] || 'Me';
         mePerson = await this.prisma.person.create({
           data: {
             userId: this.userId,
-            names: [this.userId], // Temporary name, user can update later
-            emails: [this.userId],
+            names: [userName],
+            emails: this.userEmail ? [this.userEmail] : [],
             metadata: {
               isMe: true,
               source: 'linkedin_archive',
@@ -400,9 +425,10 @@ export class LinkedInArchiveParser {
             const otherPersonName = isSentByMe ? toName : fromName;
             const otherPersonProfileUrl = isSentByMe ? toProfileUrls : fromProfileUrl;
 
-            // Try to find or create the other person
+            // Try to find or create the other person (within this user's data only)
             let otherPerson = await this.prisma.person.findFirst({
               where: {
+                userId: this.userId,
                 names: {
                   has: otherPersonName,
                 },
@@ -432,7 +458,7 @@ export class LinkedInArchiveParser {
               isSentByMe ? mePerson.id : otherPerson.id,
               isSentByMe ? otherPerson.id : mePerson.id,
               {
-                relationshipType: 'messaged',
+                relationshipType: 'interacted_with',
                 sources: ['linkedin_archive'],
                 firstSeenAt: date ? this.parseDate(date) : new Date(),
               }
@@ -480,6 +506,7 @@ export class LinkedInArchiveParser {
   /**
    * Upsert person record with deduplication
    * Searches by email first, then by exact name match to prevent duplicates
+   * IMPORTANT: Always filters by userId for multi-tenant isolation
    */
   private async upsertPerson(data: {
     names: string[];
@@ -487,10 +514,11 @@ export class LinkedInArchiveParser {
     title?: string;
     company?: string;
   }): Promise<{ person: any; wasCreated: boolean }> {
-    // Try to find existing person by email
+    // Try to find existing person by email (within this user's data only)
     if (data.emails.length > 0) {
       const existing = await this.prisma.person.findFirst({
         where: {
+          userId: this.userId,
           emails: { hasSome: data.emails },
           deletedAt: null,
         },
@@ -506,6 +534,7 @@ export class LinkedInArchiveParser {
     if (data.names.length > 0) {
       const existing = await this.prisma.person.findFirst({
         where: {
+          userId: this.userId,
           names: { hasSome: data.names },
           deletedAt: null,
         },
