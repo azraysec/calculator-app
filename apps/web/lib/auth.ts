@@ -25,55 +25,58 @@ const fullAuthConfig = {
   adapter: PrismaAdapter(prisma),
 
   callbacks: {
-    ...authConfig.callbacks,
     /**
      * signIn callback - runs BEFORE user is created by adapter
      * DO NOT create/upsert users here - it conflicts with PrismaAdapter
      * Just validate and return true to allow sign-in
      */
     async signIn() {
-      // Allow all Google sign-ins
-      // Token storage happens in events.signIn AFTER user exists
       return true;
     },
 
     /**
-     * Add user ID to session for API route authorization
+     * JWT callback - add user ID to token
+     * With JWT strategy, this is called on every request
      */
-    async session({ session, user }: { session: any; user: any }) {
-      if (session.user) {
-        session.user.id = user.id;
-      }
-      return session;
-    },
-
-    /**
-     * Add user ID to JWT token
-     */
-    async jwt({ token, user }: { token: any; user?: any }) {
+    async jwt({ token, user, account }: { token: any; user?: any; account?: any }) {
+      // On first sign-in, user and account are available
       if (user) {
         token.id = user.id;
       }
+      // Store tokens in JWT for later use
+      if (account) {
+        token.accessToken = account.access_token;
+        token.refreshToken = account.refresh_token;
+        token.expiresAt = account.expires_at;
+      }
       return token;
+    },
+
+    /**
+     * Session callback - expose user ID to client
+     */
+    async session({ session, token }: { session: any; token: any }) {
+      if (session.user && token.id) {
+        session.user.id = token.id;
+      }
+      return session;
     },
   },
 
   /**
    * Events fire AFTER the adapter operations complete
-   * Safe to update user here because they definitely exist
    */
   events: {
     /**
      * Store OAuth tokens in User model for Gmail API access
-     * This runs AFTER PrismaAdapter creates/links the user
      */
     async signIn({ user, account }: { user: any; account: any }) {
-      if (account?.provider === "google" && account.refresh_token && user?.id) {
+      if (account?.provider === "google" && user?.id) {
         try {
           await prisma.user.update({
             where: { id: user.id },
             data: {
-              googleRefreshToken: account.refresh_token,
+              googleRefreshToken: account.refresh_token ?? null,
               googleAccessToken: account.access_token ?? null,
               tokenExpiresAt: account.expires_at
                 ? new Date(account.expires_at * 1000)
@@ -81,15 +84,15 @@ const fullAuthConfig = {
             },
           });
         } catch (error) {
-          // Log but don't fail sign-in if token storage fails
           console.error("Failed to store OAuth tokens:", error);
         }
       }
     },
   },
 
+  // Use JWT strategy - simpler and doesn't require database session lookups
   session: {
-    strategy: "database" as const,
+    strategy: "jwt" as const,
   },
 
   debug: process.env.NODE_ENV === "development",
