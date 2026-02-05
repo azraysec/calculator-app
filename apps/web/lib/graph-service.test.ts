@@ -53,6 +53,9 @@ describe('createGraphService', () => {
     expect(capturedCallbacks.getIncomingEdges).toBeInstanceOf(Function);
     expect(capturedCallbacks.getAllPeople).toBeInstanceOf(Function);
     expect(capturedCallbacks.getStats).toBeInstanceOf(Function);
+    // Batch methods for performance
+    expect(capturedCallbacks.getPeople).toBeInstanceOf(Function);
+    expect(capturedCallbacks.getOutgoingEdgesForMany).toBeInstanceOf(Function);
   });
 
   describe('getPerson callback', () => {
@@ -104,18 +107,17 @@ describe('createGraphService', () => {
   });
 
   describe('getOutgoingEdges callback', () => {
-    it('should return empty array when person not found', async () => {
+    it('should return empty array when no edges found', async () => {
       createGraphService(mockUserId);
-      vi.mocked(prisma.person.findFirst).mockResolvedValue(null);
+      vi.mocked(prisma.edge.findMany).mockResolvedValue([]);
 
       const result = await capturedCallbacks.getOutgoingEdges('person-123');
 
       expect(result).toEqual([]);
     });
 
-    it('should return edges with multi-tenant filter', async () => {
+    it('should return edges with multi-tenant filter on both persons', async () => {
       createGraphService(mockUserId);
-      vi.mocked(prisma.person.findFirst).mockResolvedValue({ id: 'person-123' } as any);
       vi.mocked(prisma.edge.findMany).mockResolvedValue([
         { id: 'edge-1', fromPersonId: 'person-123', toPersonId: 'person-456', strengthFactors: {} },
       ] as any);
@@ -127,6 +129,7 @@ describe('createGraphService', () => {
         expect.objectContaining({
           where: expect.objectContaining({
             fromPersonId: 'person-123',
+            fromPerson: { userId: mockUserId },
             toPerson: { userId: mockUserId },
           }),
         })
@@ -135,18 +138,17 @@ describe('createGraphService', () => {
   });
 
   describe('getIncomingEdges callback', () => {
-    it('should return empty array when person not found', async () => {
+    it('should return empty array when no edges found', async () => {
       createGraphService(mockUserId);
-      vi.mocked(prisma.person.findFirst).mockResolvedValue(null);
+      vi.mocked(prisma.edge.findMany).mockResolvedValue([]);
 
       const result = await capturedCallbacks.getIncomingEdges('person-123');
 
       expect(result).toEqual([]);
     });
 
-    it('should return edges with multi-tenant filter', async () => {
+    it('should return edges with multi-tenant filter on both persons', async () => {
       createGraphService(mockUserId);
-      vi.mocked(prisma.person.findFirst).mockResolvedValue({ id: 'person-123' } as any);
       vi.mocked(prisma.edge.findMany).mockResolvedValue([]);
 
       await capturedCallbacks.getIncomingEdges('person-123');
@@ -156,6 +158,7 @@ describe('createGraphService', () => {
           where: expect.objectContaining({
             toPersonId: 'person-123',
             fromPerson: { userId: mockUserId },
+            toPerson: { userId: mockUserId },
           }),
         })
       );
@@ -186,6 +189,80 @@ describe('createGraphService', () => {
       const result = await capturedCallbacks.getAllPeople();
 
       expect(result[0].socialHandles).toEqual({ twitter: '@alice' });
+    });
+  });
+
+  describe('getPeople batch callback', () => {
+    it('should return empty array for empty input', async () => {
+      createGraphService(mockUserId);
+
+      const result = await capturedCallbacks.getPeople([]);
+
+      expect(result).toEqual([]);
+      expect(prisma.person.findMany).not.toHaveBeenCalled();
+    });
+
+    it('should batch fetch multiple people with userId filter', async () => {
+      createGraphService(mockUserId);
+      vi.mocked(prisma.person.findMany).mockResolvedValue([
+        { id: 'p1', names: ['Alice'], socialHandles: {} },
+        { id: 'p2', names: ['Bob'], socialHandles: null },
+      ] as any);
+
+      const result = await capturedCallbacks.getPeople(['p1', 'p2']);
+
+      expect(result).toHaveLength(2);
+      expect(prisma.person.findMany).toHaveBeenCalledWith({
+        where: {
+          id: { in: ['p1', 'p2'] },
+          userId: mockUserId,
+          deletedAt: null,
+        },
+        include: { organization: true },
+      });
+    });
+  });
+
+  describe('getOutgoingEdgesForMany batch callback', () => {
+    it('should return empty map for empty input', async () => {
+      createGraphService(mockUserId);
+
+      const result = await capturedCallbacks.getOutgoingEdgesForMany([]);
+
+      expect(result).toBeInstanceOf(Map);
+      expect(result.size).toBe(0);
+      expect(prisma.edge.findMany).not.toHaveBeenCalled();
+    });
+
+    it('should batch fetch edges for multiple people', async () => {
+      createGraphService(mockUserId);
+      vi.mocked(prisma.edge.findMany).mockResolvedValue([
+        { id: 'e1', fromPersonId: 'p1', toPersonId: 'p3', strengthFactors: {} },
+        { id: 'e2', fromPersonId: 'p2', toPersonId: 'p3', strengthFactors: {} },
+      ] as any);
+
+      const result = await capturedCallbacks.getOutgoingEdgesForMany(['p1', 'p2']);
+
+      expect(result.get('p1')).toHaveLength(1);
+      expect(result.get('p2')).toHaveLength(1);
+      expect(prisma.edge.findMany).toHaveBeenCalledWith({
+        where: {
+          fromPersonId: { in: ['p1', 'p2'] },
+          fromPerson: { userId: mockUserId },
+          toPerson: { userId: mockUserId },
+        },
+        orderBy: { strength: 'desc' },
+      });
+    });
+
+    it('should return empty arrays for people with no edges', async () => {
+      createGraphService(mockUserId);
+      vi.mocked(prisma.edge.findMany).mockResolvedValue([]);
+
+      const result = await capturedCallbacks.getOutgoingEdgesForMany(['p1', 'p2']);
+
+      expect(result.get('p1')).toEqual([]);
+      expect(result.get('p2')).toEqual([]);
     });
   });
 
