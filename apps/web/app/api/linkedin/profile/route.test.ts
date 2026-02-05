@@ -179,6 +179,18 @@ describe('LinkedIn Profile API', () => {
 
       expect(response.status).toBe(500);
       expect(data.error).toBe('Failed to fetch LinkedIn profile');
+      expect(data.details).toBe('Database error');
+    });
+
+    it('should handle non-Error exceptions', async () => {
+      vi.mocked(prisma.person.findFirst).mockRejectedValue('String error');
+
+      const response = await POST(createRequest({ vanityName: 'johndoe' }));
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe('Failed to fetch LinkedIn profile');
+      expect(data.details).toBe('Unknown error');
     });
   });
 });

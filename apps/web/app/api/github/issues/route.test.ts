@@ -256,6 +256,80 @@ describe('GitHub Issues API', () => {
       expect(data.issues).toEqual([]);
     });
 
+    it('should fall back to statusText when API error has no message', async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 403,
+        statusText: 'Forbidden',
+        json: async () => ({}), // No message field
+      });
+
+      const request = new NextRequest('http://localhost:3000/api/github/issues');
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(403);
+      expect(data.error).toContain('Forbidden');
+    });
+
+    it('should handle blocked status label', async () => {
+      const mockApiResponse = [
+        {
+          number: 20,
+          title: 'Blocked issue',
+          state: 'open',
+          labels: [{ name: 'blocked' }, { name: 'P1-High' }],
+          created_at: '2026-01-30T10:00:00Z',
+          updated_at: '2026-01-30T12:00:00Z',
+          assignee: null,
+          html_url: 'https://github.com/test/repo/issues/20',
+        },
+      ];
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => mockApiResponse,
+      });
+
+      const request = new NextRequest('http://localhost:3000/api/github/issues');
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.issues[0].labels).toContain('blocked');
+      // Status should remain 'Open' since blocked doesn't change it to 'In Progress'
+      expect(data.issues[0].status).toBe('Open');
+    });
+
+    it('should return empty when filtering by invalid priority', async () => {
+      const mockApiResponse = [
+        {
+          number: 5,
+          title: 'Issue with valid priority',
+          state: 'open',
+          labels: [{ name: 'P1-High' }],
+          created_at: '2026-01-30T10:00:00Z',
+          updated_at: '2026-01-30T12:00:00Z',
+          assignee: null,
+          html_url: 'https://github.com/test/repo/issues/5',
+        },
+      ];
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => mockApiResponse,
+      });
+
+      // Filter by an invalid priority that's not in priorityMap
+      const request = new NextRequest('http://localhost:3000/api/github/issues?priority=P99-Invalid');
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      // No issues should match the invalid priority
+      expect(data.issues).toHaveLength(0);
+    });
+
     it('should return empty array on general errors', async () => {
       mockFetch.mockRejectedValue(new Error('Network error'));
 
@@ -463,6 +537,98 @@ describe('GitHub Issues API', () => {
 
       expect(response.status).toBe(500);
       expect(data.error).toContain('Network error');
+    });
+
+    it('should fall back to statusText when POST API error has no message', async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 403,
+        statusText: 'Forbidden',
+        json: async () => ({}), // No message field
+      });
+
+      const requestBody = {
+        title: 'Test issue',
+      };
+
+      const request = new NextRequest('http://localhost:3000/api/github/issues', {
+        method: 'POST',
+        body: JSON.stringify(requestBody),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(403);
+      expect(data.error).toContain('Forbidden');
+    });
+
+    it('should handle labels that is not an array', async () => {
+      const mockApiResponse = {
+        number: 18,
+        html_url: 'https://github.com/test/repo/issues/18',
+      };
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => mockApiResponse,
+      });
+
+      const requestBody = {
+        title: 'Issue with string labels',
+        labels: 'not-an-array', // String instead of array
+      };
+
+      const request = new NextRequest('http://localhost:3000/api/github/issues', {
+        method: 'POST',
+        body: JSON.stringify(requestBody),
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(201);
+
+      // Verify labels in API call doesn't include the invalid non-array labels
+      const callArgs = mockFetch.mock.calls[0];
+      const body = JSON.parse(callArgs[1].body);
+      expect(body.labels).toEqual([]); // Only priority would be added if present
+    });
+
+    it('should use default repo values when env vars not set', async () => {
+      const originalOwner = process.env.GITHUB_REPO_OWNER;
+      const originalName = process.env.GITHUB_REPO_NAME;
+      delete process.env.GITHUB_REPO_OWNER;
+      delete process.env.GITHUB_REPO_NAME;
+
+      const mockApiResponse = {
+        number: 19,
+        html_url: 'https://github.com/azraysec/calculator-app/issues/19',
+      };
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => mockApiResponse,
+      });
+
+      const requestBody = {
+        title: 'Test default repo',
+      };
+
+      const request = new NextRequest('http://localhost:3000/api/github/issues', {
+        method: 'POST',
+        body: JSON.stringify(requestBody),
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(201);
+
+      // Verify default repo values are used
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://api.github.com/repos/azraysec/calculator-app/issues',
+        expect.any(Object)
+      );
+
+      process.env.GITHUB_REPO_OWNER = originalOwner;
+      process.env.GITHUB_REPO_NAME = originalName;
     });
   });
 });
