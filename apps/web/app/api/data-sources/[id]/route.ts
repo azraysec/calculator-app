@@ -16,7 +16,7 @@ import { withAuth, forbiddenResponse } from '@/lib/auth-helpers';
  */
 export const GET = withAuth(async (_request, { userId, params }) => {
   try {
-    const connectionId = params?.params?.id || params?.id;
+    const { id: connectionId } = await params;
     if (!connectionId) {
       return NextResponse.json(
         { error: 'Data source ID is required' },
@@ -67,7 +67,7 @@ export const GET = withAuth(async (_request, { userId, params }) => {
  */
 export const PATCH = withAuth(async (request, { userId, params }) => {
   try {
-    const connectionId = params?.params?.id || params?.id;
+    const { id: connectionId } = await params;
     if (!connectionId) {
       return NextResponse.json(
         { error: 'Data source ID is required' },
@@ -130,7 +130,7 @@ export const PATCH = withAuth(async (request, { userId, params }) => {
  */
 export const DELETE = withAuth(async (_request, { userId, params }) => {
   try {
-    const connectionId = params?.params?.id || params?.id;
+    const { id: connectionId } = await params;
     if (!connectionId) {
       return NextResponse.json(
         { error: 'Data source ID is required' },
