@@ -188,6 +188,60 @@ export async function POST(_request: NextRequest) {
                 } as any,
               },
             });
+
+            // Create or update Edge between user's person and the participant
+            // This ensures Gmail-sourced connections show up with their source
+            if (user.person?.id && person.id !== user.person.id) {
+              const fromPersonId = isSent ? user.person.id : person.id;
+              const toPersonId = isSent ? person.id : user.person.id;
+
+              const existingEdge = await prisma.edge.findFirst({
+                where: {
+                  fromPersonId,
+                  toPersonId,
+                },
+              });
+
+              if (existingEdge) {
+                // Update existing edge - add gmail to sources if not present
+                const currentSources = existingEdge.sources || [];
+                if (!currentSources.includes('gmail')) {
+                  await prisma.edge.update({
+                    where: { id: existingEdge.id },
+                    data: {
+                      sources: [...currentSources, 'gmail'],
+                      channels: Array.from(new Set([...(existingEdge.channels || []), 'email'])),
+                      interactionCount: existingEdge.interactionCount + 1,
+                      lastSeenAt: interaction.timestamp,
+                    },
+                  });
+                } else {
+                  // Just update interaction count and lastSeenAt
+                  await prisma.edge.update({
+                    where: { id: existingEdge.id },
+                    data: {
+                      interactionCount: existingEdge.interactionCount + 1,
+                      lastSeenAt: interaction.timestamp,
+                    },
+                  });
+                }
+              } else {
+                // Create new edge with gmail source
+                await prisma.edge.create({
+                  data: {
+                    fromPersonId,
+                    toPersonId,
+                    relationshipType: 'interacted_with',
+                    strength: 0.3, // Default strength for email interaction
+                    sources: ['gmail'],
+                    channels: ['email'],
+                    interactionCount: 1,
+                    firstSeenAt: interaction.timestamp,
+                    lastSeenAt: interaction.timestamp,
+                  },
+                });
+              }
+            }
           }
         }
 

@@ -25,6 +25,11 @@ vi.mock('@wig/db', () => ({
     evidenceEvent: {
       create: vi.fn(),
     },
+    edge: {
+      findFirst: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+    },
   },
 }));
 
