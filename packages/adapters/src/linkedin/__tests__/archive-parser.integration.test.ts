@@ -5,7 +5,7 @@
  * NO MOCKS - tests actual database operations with real UUIDs.
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 import { PrismaClient } from '@prisma/client';
 import { LinkedInArchiveParser } from '../archive-parser';
 import { randomUUID } from 'crypto';

@@ -302,6 +302,10 @@ export class LinkedInArchiveParser {
       errors: [] as string[],
     };
 
+    // Track skipped messages for debugging (declared outside try so we can log them at the end)
+    let skippedNoSender = 0;
+    let skippedNoRecipient = 0;
+
     try {
       // LinkedIn CSVs may have a "Notes:" header section - skip it
       let cleanedContent = csvContent;
@@ -321,6 +325,35 @@ export class LinkedInArchiveParser {
         trim: true,
         relax_column_count: true,
       }) as Array<Record<string, string>>;
+
+      // Log parsed record count for debugging
+      console.log(`[Parser] Parsed ${records.length} message records from CSV`);
+
+      if (records.length === 0) {
+        console.log('[Parser] WARNING: No message records found in messages.csv');
+        return result;
+      }
+
+      // Log the actual column names from the CSV for debugging
+      const sampleRecord = records[0];
+      const columnNames = Object.keys(sampleRecord);
+      console.log(`[Parser] CSV columns found: ${columnNames.join(', ')}`);
+
+      // Verify required columns exist
+      const hasFrom = columnNames.some(c => c.toUpperCase() === 'FROM');
+      const hasTo = columnNames.some(c => c.toUpperCase() === 'TO');
+      const hasContent = columnNames.some(c => c.toUpperCase() === 'CONTENT');
+      const hasDate = columnNames.some(c => c.toUpperCase() === 'DATE');
+      const hasConversationId = columnNames.some(c => c.toUpperCase().includes('CONVERSATION'));
+
+      if (!hasFrom || !hasTo) {
+        console.log('[Parser] WARNING: Missing required columns. FROM found:', hasFrom, ', TO found:', hasTo);
+        console.log('[Parser] Sample record keys:', columnNames);
+        result.errors.push('Messages CSV missing required FROM/TO columns');
+        return result;
+      }
+
+      console.log(`[Parser] Column validation: FROM=${hasFrom}, TO=${hasTo}, CONTENT=${hasContent}, DATE=${hasDate}, CONVERSATION_ID=${hasConversationId}`);
 
       // Get or create "me" person for this user
       let mePerson = await this.prisma.person.findFirst({
@@ -362,6 +395,8 @@ export class LinkedInArchiveParser {
         }
         conversationMap.get(conversationId)!.push(record);
       }
+
+      console.log(`[Parser] Grouped ${records.length} messages into ${conversationMap.size} conversations`);
 
       // Process each conversation
       for (const [conversationId, messages] of conversationMap.entries()) {
@@ -410,8 +445,13 @@ export class LinkedInArchiveParser {
             const content = msg['CONTENT'] || msg['content'];
             const subject = msg['SUBJECT'] || msg['subject'];
 
-            if (!fromName || !toName) {
-              continue; // Skip messages without sender/recipient
+            if (!fromName) {
+              skippedNoSender++;
+              continue; // Skip messages without sender
+            }
+            if (!toName) {
+              skippedNoRecipient++;
+              continue; // Skip messages without recipient
             }
 
             // Determine if this is a sent or received message by comparing with mePerson
@@ -498,6 +538,17 @@ export class LinkedInArchiveParser {
       result.errors.push(
         `Messages CSV parsing failed: ${error instanceof Error ? error.message : 'Unknown'}`
       );
+    }
+
+    // Log summary of message processing
+    console.log(`[Parser] Message processing complete:`);
+    console.log(`[Parser]   - Messages processed: ${result.count}`);
+    console.log(`[Parser]   - Evidence events created: ${result.evidenceEvents}`);
+    console.log(`[Parser]   - New persons created: ${result.newPersons}`);
+    console.log(`[Parser]   - Skipped (no sender): ${skippedNoSender}`);
+    console.log(`[Parser]   - Skipped (no recipient): ${skippedNoRecipient}`);
+    if (result.errors.length > 0) {
+      console.log(`[Parser]   - Errors: ${result.errors.length}`);
     }
 
     return result;
