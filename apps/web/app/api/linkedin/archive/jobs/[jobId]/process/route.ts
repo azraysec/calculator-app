@@ -4,29 +4,34 @@
  *
  * Processes uploaded LinkedIn archive inline with 5-minute timeout
  * Extracts ZIP, parses CSV files, creates evidence events
+ * SECURITY: Requires authentication and verifies job ownership
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { LinkedInArchiveParser } from '@wig/adapters';
 import { LinkedInRelationshipScorer } from '@wig/core';
 import { writeFile, unlink } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
+import { withAuth } from '@/lib/auth-helpers';
 
 export const maxDuration = 300; // 5 minutes max
 
-export async function POST(
-  _request: NextRequest,
-  { params }: { params: Promise<{ jobId: string }> }
-) {
+export const POST = withAuth(async (
+  _request: Request,
+  { userId, params }
+) => {
   const { jobId } = await params;
   let tempFilePath: string | null = null;
 
   try {
-    // Get job record
-    const job = await prisma.ingestJob.findUnique({
-      where: { id: jobId },
+    // CRITICAL: Filter by userId for multi-tenant isolation
+    const job = await prisma.ingestJob.findFirst({
+      where: {
+        id: jobId,
+        userId, // Only allow processing jobs belonging to authenticated user
+      },
     });
 
     if (!job) {
@@ -87,16 +92,12 @@ export async function POST(
       data: { progress: 10, logs: 'File downloaded, starting extraction...' },
     });
 
-    // Parse archive
-    console.log(`[Process] Starting parse`);
-
-    if (!job.userId) {
-      throw new Error('IngestJob missing userId - cannot process');
-    }
+    // Parse archive - use authenticated userId (already verified via job ownership)
+    console.log(`[Process] Starting parse for user: ${userId}`);
 
     const parser = new LinkedInArchiveParser(
       prisma,
-      job.userId,
+      userId,
       (progress) => {
         prisma.ingestJob.update({
           where: { id: jobId },
@@ -124,7 +125,7 @@ export async function POST(
     });
 
     const scorer = new LinkedInRelationshipScorer(prisma);
-    const rescoredCount = await scorer.rescorePersonEdges(job.userId);
+    const rescoredCount = await scorer.rescorePersonEdges(userId);
     console.log(`[Process] Rescored ${rescoredCount} edges`);
 
     // Complete job
@@ -202,9 +203,8 @@ export async function POST(
       {
         error: 'Processing failed',
         details: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined,
       },
       { status: 500 }
     );
   }
-}
+});

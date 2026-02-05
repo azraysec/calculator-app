@@ -3,20 +3,26 @@
  * GET /api/linkedin/archive/jobs/:jobId
  *
  * Returns job status, progress, and results
+ * SECURITY: Requires authentication and verifies job ownership
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { withAuth } from '@/lib/auth-helpers';
 
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ jobId: string }> }
-) {
+export const GET = withAuth(async (
+  _request: Request,
+  { userId, params }
+) => {
   try {
     const { jobId } = await params;
 
-    const job = await prisma.ingestJob.findUnique({
-      where: { id: jobId },
+    // CRITICAL: Filter by userId for multi-tenant isolation
+    const job = await prisma.ingestJob.findFirst({
+      where: {
+        id: jobId,
+        userId, // Only return jobs belonging to authenticated user
+      },
     });
 
     if (!job) {
@@ -47,4 +53,4 @@ export async function GET(
       { status: 500 }
     );
   }
-}
+});
