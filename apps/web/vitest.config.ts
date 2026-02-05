@@ -6,6 +6,11 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     setupFiles: ['./test-setup.ts'],
+    exclude: [
+      '**/node_modules/**',
+      '**/e2e/**',
+      '**/*.spec.ts', // Playwright tests
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

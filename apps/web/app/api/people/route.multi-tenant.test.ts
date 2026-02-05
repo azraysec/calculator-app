@@ -9,29 +9,16 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { GET } from './route';
-import * as authHelpers from '@/lib/auth-helpers';
+import { auth } from '@/lib/auth';
 
-// Mock auth helper - use actual withAuth wrapper, only mock getAuthenticatedUserId
-vi.mock('@/lib/auth-helpers', async () => {
-  const actual = await vi.importActual<typeof import('@/lib/auth-helpers')>('@/lib/auth-helpers');
-  return {
-    ...actual, // Pass through withAuth, unauthorizedResponse, forbiddenResponse
-    getAuthenticatedUserId: vi.fn(), // Only mock the auth check
-  };
-});
+// auth is already mocked in test-setup.ts
 
-// Mock @wig/db (this is what route imports via @/lib/prisma)
-vi.mock('@wig/db', () => ({
+// Mock @/lib/prisma
+vi.mock('@/lib/prisma', () => ({
   prisma: {
     person: {
       findMany: vi.fn(),
     },
-  },
-  Prisma: {},
-  PrismaClient: class PrismaClient {
-    person = {
-      findMany: vi.fn(),
-    };
   },
 }));
 
@@ -57,34 +44,16 @@ describe('GET /api/people - Multi-tenant isolation', () => {
     },
   ];
 
-  const user2People = [
-    {
-      id: 'person-2',
-      userId: user2Id,
-      names: ['Bob Jones'],
-      emails: ['bob@example.com'],
-      phones: [],
-      title: 'Manager',
-      organizationId: null,
-      organization: null,
-      deletedAt: null,
-      socialHandles: null,
-      metadata: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-  ];
-
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('should only return people belonging to the authenticated user', async () => {
-    const { prisma } = await import('@wig/db');
+    const { prisma } = await import('@/lib/prisma');
 
     // Mock user1 authentication
-    vi.mocked(authHelpers.getAuthenticatedUserId).mockResolvedValue(user1Id);
-    (prisma.person.findMany as any).mockResolvedValue(user1People);
+    vi.mocked(auth).mockResolvedValue({ user: { id: user1Id } } as any);
+    vi.mocked(prisma.person.findMany).mockResolvedValue(user1People);
 
     const request = new Request('http://localhost/api/people?q=alice');
     const response = await GET(request, {});
@@ -109,11 +78,11 @@ describe('GET /api/people - Multi-tenant isolation', () => {
   });
 
   it('should not return other users people in search results', async () => {
-    const { prisma } = await import('@wig/db');
+    const { prisma } = await import('@/lib/prisma');
 
     // Mock user1 authentication searching for user2's person
-    vi.mocked(authHelpers.getAuthenticatedUserId).mockResolvedValue(user1Id);
-    (prisma.person.findMany as any).mockResolvedValue([]);
+    vi.mocked(auth).mockResolvedValue({ user: { id: user1Id } } as any);
+    vi.mocked(prisma.person.findMany).mockResolvedValue([]);
 
     const request = new Request('http://localhost/api/people?q=Bob');
     const response = await GET(request, {});
@@ -127,9 +96,7 @@ describe('GET /api/people - Multi-tenant isolation', () => {
 
   it('should return 401 when not authenticated', async () => {
     // Mock authentication failure
-    vi.mocked(authHelpers.getAuthenticatedUserId).mockRejectedValue(
-      new Error('Unauthorized')
-    );
+    vi.mocked(auth).mockResolvedValue(null as any);
 
     const request = new Request('http://localhost/api/people?q=test');
     const response = await GET(request, {});
@@ -140,9 +107,7 @@ describe('GET /api/people - Multi-tenant isolation', () => {
   });
 
   it('should return validation error for missing query parameter', async () => {
-    const { prisma } = await import('@wig/db');
-
-    vi.mocked(authHelpers.getAuthenticatedUserId).mockResolvedValue(user1Id);
+    vi.mocked(auth).mockResolvedValue({ user: { id: user1Id } } as any);
 
     const request = new Request('http://localhost/api/people');
     const response = await GET(request, {});
@@ -154,11 +119,11 @@ describe('GET /api/people - Multi-tenant isolation', () => {
   });
 
   it('should filter results by userId even with fuzzy matching', async () => {
-    const { prisma } = await import('@wig/db');
+    const { prisma } = await import('@/lib/prisma');
 
-    vi.mocked(authHelpers.getAuthenticatedUserId).mockResolvedValue(user1Id);
+    vi.mocked(auth).mockResolvedValue({ user: { id: user1Id } } as any);
     // Mock empty exact match results to trigger fuzzy matching
-    (prisma.person.findMany as any).mockResolvedValue(user1People);
+    vi.mocked(prisma.person.findMany).mockResolvedValue(user1People);
 
     const request = new Request('http://localhost/api/people?q=Alise'); // Typo in name
     const response = await GET(request, {});

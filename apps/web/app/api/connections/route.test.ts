@@ -4,7 +4,9 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { GET } from './route';
-import { NextRequest } from 'next/server';
+import { auth } from '@/lib/auth';
+
+// auth is already mocked in test-setup.ts
 
 // Mock Prisma
 vi.mock('@/lib/prisma', () => ({
@@ -20,6 +22,8 @@ vi.mock('@/lib/prisma', () => ({
 }));
 
 describe('Connections API', () => {
+  const userId = 'test-user-id';
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -27,9 +31,12 @@ describe('Connections API', () => {
   it('should return connections with default pagination', async () => {
     const { prisma } = await import('@/lib/prisma');
 
-    (prisma.person.findMany as any).mockResolvedValue([
+    vi.mocked(auth).mockResolvedValue({ user: { id: userId } } as any);
+
+    vi.mocked(prisma.person.findMany).mockResolvedValue([
       {
         id: '1',
+        userId,
         names: ['John Doe'],
         emails: ['john@example.com'],
         title: 'Engineer',
@@ -38,21 +45,19 @@ describe('Connections API', () => {
         updatedAt: new Date(),
         metadata: {},
         _count: {
-          edgesFrom: 5,
-          edgesTo: 3,
-          evidenceEventsAsSubject: 10,
-          evidenceEventsAsObject: 8,
+          outgoingEdges: 5,
+          incomingEdges: 3,
         },
       },
-    ]);
+    ] as any);
 
-    (prisma.person.count as any).mockResolvedValue(1);
-    (prisma.edge.findMany as any).mockResolvedValue([
-      { sources: ['linkedin_archive'] },
-    ]);
+    vi.mocked(prisma.person.count).mockResolvedValue(1);
+    vi.mocked(prisma.edge.findMany).mockResolvedValue([
+      { sources: ['linkedin_archive'], interactionCount: 5 },
+    ] as any);
 
-    const request = new NextRequest('http://localhost:3000/api/connections');
-    const response = await GET(request);
+    const request = new Request('http://localhost:3000/api/connections');
+    const response = await GET(request, {});
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -68,14 +73,19 @@ describe('Connections API', () => {
   it('should apply name filter', async () => {
     const { prisma } = await import('@/lib/prisma');
 
-    const request = new NextRequest(
+    vi.mocked(auth).mockResolvedValue({ user: { id: userId } } as any);
+    vi.mocked(prisma.person.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.person.count).mockResolvedValue(0);
+
+    const request = new Request(
       'http://localhost:3000/api/connections?name=John'
     );
-    await GET(request);
+    await GET(request, {});
 
     expect(prisma.person.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
+          userId,
           names: { hasSome: ['John'] },
         }),
       })
@@ -85,10 +95,14 @@ describe('Connections API', () => {
   it('should apply sorting', async () => {
     const { prisma } = await import('@/lib/prisma');
 
-    const request = new NextRequest(
+    vi.mocked(auth).mockResolvedValue({ user: { id: userId } } as any);
+    vi.mocked(prisma.person.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.person.count).mockResolvedValue(0);
+
+    const request = new Request(
       'http://localhost:3000/api/connections?sortBy=title&sortOrder=desc'
     );
-    await GET(request);
+    await GET(request, {});
 
     expect(prisma.person.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -100,10 +114,14 @@ describe('Connections API', () => {
   it('should apply pagination', async () => {
     const { prisma } = await import('@/lib/prisma');
 
-    const request = new NextRequest(
+    vi.mocked(auth).mockResolvedValue({ user: { id: userId } } as any);
+    vi.mocked(prisma.person.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.person.count).mockResolvedValue(0);
+
+    const request = new Request(
       'http://localhost:3000/api/connections?page=2&pageSize=10'
     );
-    await GET(request);
+    await GET(request, {});
 
     expect(prisma.person.findMany).toHaveBeenCalledWith(
       expect.objectContaining({

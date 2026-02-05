@@ -10,16 +10,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { GET } from './route';
 import { prisma } from '@/lib/prisma';
-import * as authHelpers from '@/lib/auth-helpers';
+import { auth } from '@/lib/auth';
 
-// Mock auth helper - use actual withAuth wrapper, only mock getAuthenticatedUserId
-vi.mock('@/lib/auth-helpers', async () => {
-  const actual = await vi.importActual<typeof import('@/lib/auth-helpers')>('@/lib/auth-helpers');
-  return {
-    ...actual, // Pass through withAuth, unauthorizedResponse, forbiddenResponse
-    getAuthenticatedUserId: vi.fn(), // Only mock the auth check
-  };
-});
+// auth is already mocked in test-setup.ts
 
 // Mock prisma
 vi.mock('@/lib/prisma', () => ({
@@ -93,7 +86,7 @@ describe('GET /api/network - Multi-tenant isolation', () => {
   });
 
   it('should only return people belonging to the authenticated user', async () => {
-    vi.mocked(authHelpers.getAuthenticatedUserId).mockResolvedValue(user1Id);
+    vi.mocked(auth).mockResolvedValue({ user: { id: user1Id } } as any);
     vi.mocked(prisma.person.findMany).mockResolvedValue(user1People);
     vi.mocked(prisma.edge.findMany).mockResolvedValue(user1Edges);
 
@@ -122,7 +115,7 @@ describe('GET /api/network - Multi-tenant isolation', () => {
   });
 
   it('should only return edges between users own people', async () => {
-    vi.mocked(authHelpers.getAuthenticatedUserId).mockResolvedValue(user1Id);
+    vi.mocked(auth).mockResolvedValue({ user: { id: user1Id } } as any);
     vi.mocked(prisma.person.findMany).mockResolvedValue(user1People);
     vi.mocked(prisma.edge.findMany).mockResolvedValue(user1Edges);
 
@@ -147,7 +140,7 @@ describe('GET /api/network - Multi-tenant isolation', () => {
   });
 
   it('should calculate statistics scoped to user data', async () => {
-    vi.mocked(authHelpers.getAuthenticatedUserId).mockResolvedValue(user1Id);
+    vi.mocked(auth).mockResolvedValue({ user: { id: user1Id } } as any);
     vi.mocked(prisma.person.findMany).mockResolvedValue(user1People);
     vi.mocked(prisma.edge.findMany).mockResolvedValue(user1Edges);
 
@@ -163,9 +156,7 @@ describe('GET /api/network - Multi-tenant isolation', () => {
   });
 
   it('should return 401 when not authenticated', async () => {
-    vi.mocked(authHelpers.getAuthenticatedUserId).mockRejectedValue(
-      new Error('Unauthorized')
-    );
+    vi.mocked(auth).mockResolvedValue(null as any);
 
     const request = new Request('http://localhost/api/network');
     const response = await GET(request, {});
@@ -182,23 +173,8 @@ describe('GET /api/network - Multi-tenant isolation', () => {
     // This edge should NOT be returned
 
     const user1PeopleIds = ['person-1', 'person-2'];
-    const crossTenantEdge = {
-      id: 'edge-cross',
-      fromPersonId: 'person-1', // user1's person
-      toPersonId: 'person-3', // user2's person
-      relationshipType: 'colleague',
-      strength: 0.5,
-      strengthFactors: {},
-      channels: ['email'],
-      sources: ['gmail'],
-      firstSeenAt: new Date(),
-      lastSeenAt: new Date(),
-      interactionCount: 5,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
 
-    vi.mocked(authHelpers.getAuthenticatedUserId).mockResolvedValue(user1Id);
+    vi.mocked(auth).mockResolvedValue({ user: { id: user1Id } } as any);
     vi.mocked(prisma.person.findMany).mockResolvedValue(user1People);
     // Mock edge query that should filter out cross-tenant edges
     vi.mocked(prisma.edge.findMany).mockResolvedValue([]);
@@ -222,7 +198,7 @@ describe('GET /api/network - Multi-tenant isolation', () => {
   });
 
   it('should group people by organization within tenant scope', async () => {
-    vi.mocked(authHelpers.getAuthenticatedUserId).mockResolvedValue(user1Id);
+    vi.mocked(auth).mockResolvedValue({ user: { id: user1Id } } as any);
     vi.mocked(prisma.person.findMany).mockResolvedValue(user1People);
     vi.mocked(prisma.edge.findMany).mockResolvedValue(user1Edges);
 

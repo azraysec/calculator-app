@@ -58,8 +58,10 @@ export function withAuth<T extends any[]>(
     try {
       const userId = await getAuthenticatedUserId();
 
-      // Extract params if provided
-      const params = args[0] as any;
+      // Extract params from Next.js context object
+      // Next.js passes { params: Promise<{ id: string }> } as the second argument
+      const context = args[0] as any;
+      const params = context?.params;
 
       return await handler(request, { userId, params });
     } catch (error) {
