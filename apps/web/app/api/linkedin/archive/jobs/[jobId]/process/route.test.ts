@@ -295,5 +295,112 @@ describe('LinkedIn Archive Job Process API', () => {
 
       expect(unlink).toHaveBeenCalled();
     });
+
+    it('should handle temp file cleanup failure on success', async () => {
+      vi.mocked(prisma.ingestJob.findFirst).mockResolvedValue({
+        id: mockJobId,
+        userId: mockUserId,
+        status: 'queued',
+        fileMetadata: { blobUrl: 'https://blob.storage/file.zip' },
+      } as any);
+      vi.mocked(prisma.ingestJob.update).mockResolvedValue({} as any);
+
+      vi.mocked(global.fetch).mockResolvedValue({
+        ok: true,
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(100)),
+      } as any);
+
+      mockParseArchive.mockResolvedValue({
+        connectionsProcessed: 10,
+        messagesProcessed: 5,
+        evidenceEventsCreated: 8,
+        newPersonsAdded: 3,
+        errors: [],
+      });
+      mockRescorePersonEdges.mockResolvedValue(10);
+
+      // Make unlink fail
+      vi.mocked(unlink).mockRejectedValue(new Error('Cleanup failed'));
+
+      const response = await POST(createRequest(), createContext());
+      const data = await response.json();
+
+      // Should still return success even if cleanup fails
+      expect(response.status).toBe(200);
+      expect(data.status).toBe('completed');
+    });
+
+    it('should handle temp file cleanup failure on error', async () => {
+      vi.mocked(prisma.ingestJob.findFirst).mockResolvedValue({
+        id: mockJobId,
+        userId: mockUserId,
+        status: 'queued',
+        fileMetadata: { blobUrl: 'https://blob.storage/file.zip' },
+      } as any);
+      vi.mocked(prisma.ingestJob.update).mockResolvedValue({} as any);
+
+      vi.mocked(global.fetch).mockResolvedValue({
+        ok: true,
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(100)),
+      } as any);
+
+      mockParseArchive.mockRejectedValue(new Error('Parse error'));
+
+      // Make unlink fail
+      vi.mocked(unlink).mockRejectedValue(new Error('Cleanup failed'));
+
+      const response = await POST(createRequest(), createContext());
+      const data = await response.json();
+
+      // Should still return error response
+      expect(response.status).toBe(500);
+      expect(data.error).toBe('Processing failed');
+    });
+
+    it('should handle job update failure during error handling', async () => {
+      vi.mocked(prisma.ingestJob.findFirst).mockResolvedValue({
+        id: mockJobId,
+        userId: mockUserId,
+        status: 'queued',
+        fileMetadata: { blobUrl: 'https://blob.storage/file.zip' },
+      } as any);
+
+      // First update succeeds (progress), then fails (error state)
+      let updateCallCount = 0;
+      vi.mocked(prisma.ingestJob.update).mockImplementation(() => {
+        updateCallCount++;
+        if (updateCallCount > 2) {
+          // Fail on the error state update
+          return Promise.reject(new Error('DB connection lost'));
+        }
+        return Promise.resolve({} as any);
+      });
+
+      vi.mocked(global.fetch).mockRejectedValue(new Error('Network error'));
+
+      const response = await POST(createRequest(), createContext());
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe('Processing failed');
+    });
+
+    it('should handle non-Error exceptions', async () => {
+      vi.mocked(prisma.ingestJob.findFirst).mockResolvedValue({
+        id: mockJobId,
+        userId: mockUserId,
+        status: 'queued',
+        fileMetadata: { blobUrl: 'https://blob.storage/file.zip' },
+      } as any);
+      vi.mocked(prisma.ingestJob.update).mockResolvedValue({} as any);
+
+      vi.mocked(global.fetch).mockRejectedValue('String error');
+
+      const response = await POST(createRequest(), createContext());
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.details).toBe('Unknown error');
+    });
   });
 });
