@@ -24,6 +24,9 @@ vi.mock('@/lib/prisma', () => ({
     edge: {
       findMany: vi.fn(),
     },
+    evidenceEvent: {
+      groupBy: vi.fn(),
+    },
   },
 }));
 
@@ -62,6 +65,7 @@ describe('GET /api/connections - Multi-tenant isolation', () => {
     vi.mocked(prisma.person.findMany).mockResolvedValue(user1Connections);
     vi.mocked(prisma.person.count).mockResolvedValue(1);
     vi.mocked(prisma.edge.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.evidenceEvent.groupBy).mockResolvedValue([]);
 
     const request = new Request('http://localhost/api/connections');
     const response = await GET(request, {});

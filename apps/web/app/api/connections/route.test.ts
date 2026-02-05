@@ -20,6 +20,9 @@ vi.mock('@/lib/prisma', () => ({
     edge: {
       findMany: vi.fn(),
     },
+    evidenceEvent: {
+      groupBy: vi.fn(),
+    },
   },
 }));
 
@@ -64,6 +67,7 @@ describe('Connections API', () => {
       vi.mocked(prisma.edge.findMany).mockResolvedValue([
         { sources: ['linkedin'], interactionCount: 10 },
       ] as any);
+      vi.mocked(prisma.evidenceEvent.groupBy).mockResolvedValue([]);
 
       const request = new Request('http://localhost/api/connections?page=1&pageSize=10');
       const response = await GET(request);
@@ -200,6 +204,11 @@ describe('Connections API', () => {
         { sources: ['linkedin'], interactionCount: 5 },
         { sources: ['gmail'], interactionCount: 10 },
       ] as any);
+      vi.mocked(prisma.evidenceEvent.groupBy).mockResolvedValue([
+        { type: 'linkedin_message_sent', _count: 3 },
+        { type: 'linkedin_message_received', _count: 5 },
+        { type: 'linkedin_connection', _count: 1 },
+      ] as any);
 
       const request = new Request('http://localhost/api/connections');
       const response = await GET(request);
@@ -208,6 +217,9 @@ describe('Connections API', () => {
       expect(data.connections[0].connectionCount).toBe(5);
       expect(data.connections[0].interactionCount).toBe(15);
       expect(data.connections[0].sources).toEqual(['linkedin', 'gmail']);
+      expect(data.connections[0].messageCount).toBe(8);
+      expect(data.connections[0].connectionEvidence).toBe(1);
+      expect(data.connections[0].totalEvidence).toBe(9);
     });
   });
 });

@@ -42,6 +42,9 @@ interface Connection {
   sources: string[];
   connectionCount: number;
   interactionCount: number;
+  messageCount?: number;
+  connectionEvidence?: number;
+  totalEvidence?: number;
   createdAt: string;
   updatedAt: string;
   metadata: any;
@@ -188,6 +191,27 @@ export function ConnectionsGrid({ onFindPath }: ConnectionsGridProps) {
         </div>
       ),
       enableSorting: false,
+    },
+    {
+      accessorKey: 'messageCount',
+      header: ({ column }) => (
+        <div className="flex items-center gap-2">
+          <span>Messages</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 w-6 p-0"
+            onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+          >
+            <ArrowUpDown className="h-3 w-3" />
+          </Button>
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="text-center text-sm">
+          {row.original.messageCount || 0}
+        </div>
+      ),
     },
     {
       accessorKey: 'connectionCount',

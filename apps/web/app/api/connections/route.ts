@@ -107,22 +107,45 @@ export const GET = withAuth(async (request: Request, { userId }) => {
       prisma.person.count({ where }),
     ]);
 
-    // Get sources from edges
+    // Get sources from edges and evidence counts
     const enrichedConnections = await Promise.all(
       connections.map(async (person) => {
-        const edges = await prisma.edge.findMany({
-          where: {
-            OR: [{ fromPersonId: person.id }, { toPersonId: person.id }],
-          },
-          select: {
-            sources: true,
-            interactionCount: true,
-          },
-        });
+        const [edges, evidenceCounts] = await Promise.all([
+          prisma.edge.findMany({
+            where: {
+              OR: [{ fromPersonId: person.id }, { toPersonId: person.id }],
+            },
+            select: {
+              sources: true,
+              interactionCount: true,
+            },
+          }),
+          // Count evidence events involving this person
+          prisma.evidenceEvent.groupBy({
+            by: ['type'],
+            where: {
+              userId,
+              OR: [
+                { subjectPersonId: person.id },
+                { objectPersonId: person.id },
+              ],
+            },
+            _count: true,
+          }),
+        ]);
 
         const allSources = Array.from(
           new Set(edges.flatMap((edge) => edge.sources))
         );
+
+        // Calculate evidence breakdown
+        const messageCount = evidenceCounts
+          .filter((e) => e.type.includes('message'))
+          .reduce((sum, e) => sum + e._count, 0);
+        const connectionEvidence = evidenceCounts
+          .filter((e) => e.type.includes('connection'))
+          .reduce((sum, e) => sum + e._count, 0);
+        const totalEvidence = evidenceCounts.reduce((sum, e) => sum + e._count, 0);
 
         return {
           id: person.id,
@@ -137,6 +160,10 @@ export const GET = withAuth(async (request: Request, { userId }) => {
             (sum, edge) => sum + (edge.interactionCount || 0),
             0
           ),
+          // New evidence fields
+          messageCount,
+          connectionEvidence,
+          totalEvidence,
           createdAt: person.createdAt,
           updatedAt: person.updatedAt,
           metadata: person.metadata,
