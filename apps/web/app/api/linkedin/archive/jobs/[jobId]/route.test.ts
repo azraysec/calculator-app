@@ -117,6 +117,18 @@ describe('LinkedIn Archive Job Status API', () => {
 
       expect(response.status).toBe(500);
       expect(data.error).toBe('Failed to get job status');
+      expect(data.details).toBe('DB error');
+    });
+
+    it('should handle non-Error exceptions', async () => {
+      vi.mocked(prisma.ingestJob.findFirst).mockRejectedValue('String error');
+
+      const response = await GET(createRequest(), createContext());
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe('Failed to get job status');
+      expect(data.details).toBe('Unknown error');
     });
 
     it('should return running job with progress', async () => {

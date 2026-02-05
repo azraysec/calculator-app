@@ -211,5 +211,63 @@ describe('Network API', () => {
       expect(data.stats.totalPeople).toBe(0);
       expect(data.stats.averageConnectionsPerPerson).toBe(0);
     });
+
+    it('should handle mapping errors with 500', async () => {
+      // Create edge with null lastSeenAt to trigger error in mapping
+      vi.mocked(prisma.person.findMany).mockResolvedValue([
+        { id: 'p1', names: ['A'], emails: [], phones: [], organization: null },
+      ] as any);
+      vi.mocked(prisma.edge.findMany).mockResolvedValue([
+        {
+          id: 'e1',
+          fromPersonId: 'p1',
+          toPersonId: 'p2',
+          strength: 0.5,
+          channels: [],
+          interactionCount: 1,
+          lastSeenAt: null, // This will cause .toISOString() to fail
+        },
+      ] as any);
+
+      const response = await GET(createRequest());
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe('Failed to fetch network data');
+    });
+
+    it('should handle non-array fields gracefully', async () => {
+      // Test the Array.isArray fallbacks for names, emails, phones, and channels
+      vi.mocked(prisma.person.findMany).mockResolvedValue([
+        {
+          id: 'p1',
+          names: null, // Not an array
+          emails: undefined, // Not an array
+          phones: 'not-an-array', // String instead of array
+          title: null,
+          organization: null,
+        },
+      ] as any);
+      vi.mocked(prisma.edge.findMany).mockResolvedValue([
+        {
+          id: 'e1',
+          fromPersonId: 'p1',
+          toPersonId: 'p2',
+          strength: 0.5,
+          channels: null, // Not an array
+          interactionCount: 1,
+          lastSeenAt: new Date(),
+        },
+      ] as any);
+
+      const response = await GET(createRequest());
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.people[0].names).toEqual([]);
+      expect(data.people[0].emails).toEqual([]);
+      expect(data.people[0].phones).toEqual([]);
+      expect(data.edges[0].channels).toEqual([]);
+    });
   });
 });

@@ -51,7 +51,10 @@ describe('Debug API', () => {
       expect(data.meUser.id).toBe('me');
     });
 
-    it('should indicate DATABASE_URL status', async () => {
+    it('should indicate DATABASE_URL status when set', async () => {
+      const originalUrl = process.env.DATABASE_URL;
+      process.env.DATABASE_URL = 'postgres://localhost/test';
+
       vi.mocked(prisma.person.count).mockResolvedValue(0);
       vi.mocked(prisma.edge.count).mockResolvedValue(0);
       vi.mocked(prisma.person.findMany).mockResolvedValue([]);
@@ -61,8 +64,27 @@ describe('Debug API', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      // DATABASE_URL is typically set in test environment
-      expect(['SET', 'NOT SET']).toContain(data.database_url);
+      expect(data.database_url).toBe('SET');
+
+      process.env.DATABASE_URL = originalUrl;
+    });
+
+    it('should indicate DATABASE_URL status when not set', async () => {
+      const originalUrl = process.env.DATABASE_URL;
+      delete process.env.DATABASE_URL;
+
+      vi.mocked(prisma.person.count).mockResolvedValue(0);
+      vi.mocked(prisma.edge.count).mockResolvedValue(0);
+      vi.mocked(prisma.person.findMany).mockResolvedValue([]);
+      vi.mocked(prisma.person.findUnique).mockResolvedValue(null);
+
+      const response = await GET();
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.database_url).toBe('NOT SET');
+
+      process.env.DATABASE_URL = originalUrl;
     });
 
     it('should handle null meUser', async () => {

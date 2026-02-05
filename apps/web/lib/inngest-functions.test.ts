@@ -203,5 +203,162 @@ describe('Inngest Functions', () => {
 
       expect(result).toEqual({ status: 'failed' });
     });
+
+    describe('processLinkedInArchive', () => {
+      it('should throw error when job not found', async () => {
+        const { processLinkedInArchive } = await import('./inngest-functions');
+        const { prisma } = await import('./prisma');
+
+        vi.mocked(prisma.ingestJob.findUnique).mockResolvedValue(null);
+
+        const event = { data: { jobId: 'non-existent-job' } };
+        const step = {
+          run: vi.fn(async (name: string, fn: () => Promise<any>) => fn()),
+        };
+
+        await expect(
+          processLinkedInArchive.handler({ event, step } as any)
+        ).rejects.toThrow('Job not found');
+      });
+
+      it('should throw error when blob URL not found', async () => {
+        const { processLinkedInArchive } = await import('./inngest-functions');
+        const { prisma } = await import('./prisma');
+
+        vi.mocked(prisma.ingestJob.findUnique).mockResolvedValue({
+          id: 'job-1',
+          userId: 'user-1',
+          fileMetadata: {}, // No blobUrl
+        } as any);
+
+        const event = { data: { jobId: 'job-1' } };
+        const step = {
+          run: vi.fn(async (name: string, fn: () => Promise<any>) => fn()),
+        };
+
+        await expect(
+          processLinkedInArchive.handler({ event, step } as any)
+        ).rejects.toThrow('Blob URL not found');
+      });
+
+      it('should throw error when userId missing', async () => {
+        const { processLinkedInArchive } = await import('./inngest-functions');
+        const { prisma } = await import('./prisma');
+
+        vi.mocked(prisma.ingestJob.findUnique).mockResolvedValue({
+          id: 'job-1',
+          userId: null, // No userId
+          fileMetadata: { blobUrl: 'https://example.com/file.zip' },
+        } as any);
+
+        const event = { data: { jobId: 'job-1' } };
+        const step = {
+          run: vi.fn(async (name: string, fn: () => Promise<any>) => fn()),
+        };
+
+        await expect(
+          processLinkedInArchive.handler({ event, step } as any)
+        ).rejects.toThrow('Job missing userId');
+      });
+
+      it('should process archive successfully', async () => {
+        const { processLinkedInArchive } = await import('./inngest-functions');
+        const { prisma } = await import('./prisma');
+        const fs = await import('fs/promises');
+
+        // Mock job lookup
+        vi.mocked(prisma.ingestJob.findUnique).mockResolvedValue({
+          id: 'job-1',
+          userId: 'user-1',
+          fileMetadata: { blobUrl: 'https://example.com/file.zip' },
+        } as any);
+
+        vi.mocked(prisma.ingestJob.update).mockResolvedValue({} as any);
+
+        // Mock fetch for downloading
+        const mockFetch = vi.fn().mockResolvedValue({
+          ok: true,
+          arrayBuffer: () => Promise.resolve(new ArrayBuffer(100)),
+        });
+        global.fetch = mockFetch as any;
+
+        // Mock fs operations
+        vi.mocked(fs.writeFile).mockResolvedValue();
+        vi.mocked(fs.unlink).mockResolvedValue();
+
+        const event = { data: { jobId: 'job-1' } };
+
+        // Create step mock that returns different values for each step
+        let stepIndex = 0;
+        const stepResults = [
+          { blobUrl: 'https://example.com/file.zip', userId: 'user-1' }, // download-from-blob
+          '/tmp/linkedin-archive-job-1.zip', // save-temp-file
+          { // parse-archive
+            connectionsProcessed: 100,
+            messagesProcessed: 50,
+            evidenceEventsCreated: 25,
+            newPersonsAdded: 10,
+            errors: [],
+          },
+          5, // rescore-relationships
+          undefined, // complete-job
+        ];
+
+        const step = {
+          run: vi.fn(async (name: string, fn: () => Promise<any>) => {
+            const result = stepResults[stepIndex];
+            stepIndex++;
+            // Only call fn for specific steps where we want to test the logic
+            if (stepIndex === 1) {
+              // For download-from-blob, we test the actual logic
+              return fn();
+            }
+            return result;
+          }),
+        };
+
+        const result = await processLinkedInArchive.handler({ event, step } as any);
+
+        expect(result).toEqual({
+          connectionsProcessed: 100,
+          messagesProcessed: 50,
+          edgesRescored: 5,
+        });
+      });
+
+      it('should handle fetch error when downloading', async () => {
+        const { processLinkedInArchive } = await import('./inngest-functions');
+        const { prisma } = await import('./prisma');
+
+        vi.mocked(prisma.ingestJob.findUnique).mockResolvedValue({
+          id: 'job-1',
+          userId: 'user-1',
+          fileMetadata: { blobUrl: 'https://example.com/file.zip' },
+        } as any);
+        vi.mocked(prisma.ingestJob.update).mockResolvedValue({} as any);
+
+        const mockFetch = vi.fn().mockResolvedValue({
+          ok: false,
+          statusText: 'Not Found',
+        });
+        global.fetch = mockFetch as any;
+
+        const event = { data: { jobId: 'job-1' } };
+        let stepIndex = 0;
+        const step = {
+          run: vi.fn(async (name: string, fn: () => Promise<any>) => {
+            stepIndex++;
+            if (stepIndex <= 2) {
+              return fn(); // Execute first two steps
+            }
+            return {};
+          }),
+        };
+
+        await expect(
+          processLinkedInArchive.handler({ event, step } as any)
+        ).rejects.toThrow('Failed to download file from blob');
+      });
+    });
   });
 });

@@ -445,5 +445,24 @@ describe('GitHub Issues API', () => {
       expect(response.status).toBe(422);
       expect(data.error).toContain('Validation failed');
     });
+
+    it('should handle fetch network errors', async () => {
+      mockFetch.mockRejectedValue(new Error('Network error'));
+
+      const requestBody = {
+        title: 'Test issue',
+      };
+
+      const request = new NextRequest('http://localhost:3000/api/github/issues', {
+        method: 'POST',
+        body: JSON.stringify(requestBody),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toContain('Network error');
+    });
   });
 });

@@ -119,6 +119,14 @@ describe('Data Source by ID API', () => {
       expect(response.status).toBe(500);
       expect(data.error).toBe('Failed to fetch data source');
     });
+
+    it('should return 400 when id is missing', async () => {
+      const response = await GET(createRequest(), { params: Promise.resolve({ id: '' }) } as any);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe('Data source ID is required');
+    });
   });
 
   describe('PATCH /api/data-sources/[id]', () => {
@@ -195,6 +203,14 @@ describe('Data Source by ID API', () => {
       expect(response.status).toBe(500);
       expect(data.error).toBe('Failed to update data source');
     });
+
+    it('should return 400 when id is missing', async () => {
+      const response = await PATCH(createRequest('PATCH', { privacyLevel: 'SHARED' }), { params: Promise.resolve({ id: '' }) } as any);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe('Data source ID is required');
+    });
   });
 
   describe('DELETE /api/data-sources/[id]', () => {
@@ -266,6 +282,14 @@ describe('Data Source by ID API', () => {
 
       expect(response.status).toBe(500);
       expect(data.error).toBe('Failed to delete data source');
+    });
+
+    it('should return 400 when id is missing', async () => {
+      const response = await DELETE(createRequest('DELETE'), { params: Promise.resolve({ id: '' }) } as any);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe('Data source ID is required');
     });
   });
 });

@@ -185,6 +185,18 @@ describe('Seed API', () => {
 
       expect(response.status).toBe(500);
       expect(data.error).toBe('Failed to seed database');
+      expect(data.details).toBe('Connection failed');
+    });
+
+    it('should handle non-Error exceptions', async () => {
+      vi.mocked(prisma.edge.deleteMany).mockRejectedValue('String error');
+
+      const response = await POST(createRequest('Bearer dev-seed-secret'));
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe('Failed to seed database');
+      expect(data.details).toBe('Unknown error');
     });
 
     it('should create organizations and people', async () => {

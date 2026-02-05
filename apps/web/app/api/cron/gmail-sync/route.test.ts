@@ -303,5 +303,175 @@ describe('Gmail Sync Cron Job', () => {
         },
       });
     });
+
+    it('should handle null metadata fields gracefully', async () => {
+      vi.mocked(prisma.user.findMany).mockResolvedValue([
+        {
+          id: 'user-1',
+          email: 'user@example.com',
+          googleRefreshToken: 'token',
+          googleAccessToken: null,
+          lastGmailSyncAt: null,
+          person: null,
+        },
+      ] as any);
+      vi.mocked(prisma.user.update).mockResolvedValue({} as any);
+      vi.mocked(prisma.conversation.upsert).mockResolvedValue({ id: 'conv-1' } as any);
+      vi.mocked(prisma.message.create).mockResolvedValue({} as any);
+      vi.mocked(prisma.person.findFirst).mockResolvedValue(null);
+      vi.mocked(prisma.person.create).mockResolvedValue({ id: 'person-new' } as any);
+      vi.mocked(prisma.evidenceEvent.create).mockResolvedValue({} as any);
+
+      mockAdapter.validateConnection.mockResolvedValue({ valid: true });
+      mockAdapter.listInteractions.mockResolvedValue({
+        items: [
+          {
+            sourceId: 'msg-1',
+            sourceName: 'gmail',
+            timestamp: new Date(),
+            participants: ['sender@example.com', 'recipient@example.com'],
+            metadata: {
+              threadId: 'thread-1',
+              // subject and labels are undefined
+            },
+          },
+        ],
+        hasMore: false,
+      });
+
+      const response = await POST(createRequest());
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.results[0].status).toBe('success');
+      // Should create evidence with email_received type (labels undefined, not SENT)
+      expect(prisma.evidenceEvent.create).toHaveBeenCalled();
+    });
+
+    it('should handle non-Error exceptions in user processing', async () => {
+      vi.mocked(prisma.user.findMany).mockResolvedValue([
+        {
+          id: 'user-1',
+          email: 'user@example.com',
+          googleRefreshToken: 'token',
+          googleAccessToken: null,
+          lastGmailSyncAt: null,
+          person: null,
+        },
+      ] as any);
+
+      mockAdapter.validateConnection.mockRejectedValue('String error');
+
+      const response = await POST(createRequest());
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.results[0].status).toBe('error');
+      expect(data.results[0].error).toBe('Unknown error');
+    });
+
+    it('should handle non-Error exceptions in fatal errors', async () => {
+      vi.mocked(prisma.user.findMany).mockRejectedValue('String fatal error');
+
+      const response = await POST(createRequest());
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.success).toBe(false);
+      expect(data.error).toBe('Unknown error');
+    });
+
+    it('should use user.person.id when available', async () => {
+      vi.mocked(prisma.user.findMany).mockResolvedValue([
+        {
+          id: 'user-1',
+          email: 'user@example.com',
+          googleRefreshToken: 'token',
+          googleAccessToken: null,
+          lastGmailSyncAt: null,
+          person: { id: 'user-person-id' },
+        },
+      ] as any);
+      vi.mocked(prisma.user.update).mockResolvedValue({} as any);
+      vi.mocked(prisma.conversation.upsert).mockResolvedValue({ id: 'conv-1' } as any);
+      vi.mocked(prisma.message.create).mockResolvedValue({} as any);
+      vi.mocked(prisma.person.findFirst).mockResolvedValue({ id: 'existing-person' } as any);
+      vi.mocked(prisma.evidenceEvent.create).mockResolvedValue({} as any);
+
+      mockAdapter.validateConnection.mockResolvedValue({ valid: true });
+      mockAdapter.listInteractions.mockResolvedValue({
+        items: [
+          {
+            sourceId: 'msg-1',
+            sourceName: 'gmail',
+            timestamp: new Date(),
+            participants: ['sender@example.com', 'recipient@example.com'],
+            metadata: {
+              threadId: 'thread-1',
+              subject: 'Test',
+              labels: ['INBOX'],
+            },
+          },
+        ],
+        hasMore: false,
+      });
+
+      await POST(createRequest());
+
+      expect(prisma.evidenceEvent.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            subjectPersonId: 'user-person-id',
+          }),
+        })
+      );
+    });
+
+    it('should use person.id when user.person is null', async () => {
+      vi.mocked(prisma.user.findMany).mockResolvedValue([
+        {
+          id: 'user-1',
+          email: 'user@example.com',
+          googleRefreshToken: 'token',
+          googleAccessToken: null,
+          lastGmailSyncAt: null,
+          person: null,
+        },
+      ] as any);
+      vi.mocked(prisma.user.update).mockResolvedValue({} as any);
+      vi.mocked(prisma.conversation.upsert).mockResolvedValue({ id: 'conv-1' } as any);
+      vi.mocked(prisma.message.create).mockResolvedValue({} as any);
+      vi.mocked(prisma.person.findFirst).mockResolvedValue(null);
+      vi.mocked(prisma.person.create).mockResolvedValue({ id: 'created-person' } as any);
+      vi.mocked(prisma.evidenceEvent.create).mockResolvedValue({} as any);
+
+      mockAdapter.validateConnection.mockResolvedValue({ valid: true });
+      mockAdapter.listInteractions.mockResolvedValue({
+        items: [
+          {
+            sourceId: 'msg-1',
+            sourceName: 'gmail',
+            timestamp: new Date(),
+            participants: ['sender@example.com', 'recipient@example.com'],
+            metadata: {
+              threadId: 'thread-1',
+              subject: 'Test',
+              labels: ['INBOX'],
+            },
+          },
+        ],
+        hasMore: false,
+      });
+
+      await POST(createRequest());
+
+      expect(prisma.evidenceEvent.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            subjectPersonId: 'created-person',
+          }),
+        })
+      );
+    });
   });
 });

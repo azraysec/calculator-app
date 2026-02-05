@@ -183,3 +183,50 @@ describe('addRateLimitHeaders', () => {
     expect(newHeaders.get('X-RateLimit-Remaining')).toBe('0');
   });
 });
+
+describe('InMemoryRateLimiter cleanup', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  it('should clean up expired entries after window expires', async () => {
+    const config = { limit: 5, window: 1 }; // 1 second window
+    const identifier = `cleanup-test-${Date.now()}`;
+
+    // Make a request to create an entry
+    await rateLimit(identifier, config);
+
+    // Advance time past the window
+    vi.advanceTimersByTime(2000);
+
+    // Make another request - should reset since window expired
+    const result = await rateLimit(identifier, config);
+
+    expect(result.success).toBe(true);
+    expect(result.remaining).toBe(4); // Full limit - 1
+  });
+
+  it('should track different users independently after cleanup', async () => {
+    const config = { limit: 2, window: 1 };
+
+    // User 1 hits limit
+    const user1Id = `user1-${Date.now()}`;
+    await rateLimit(user1Id, config);
+    await rateLimit(user1Id, config);
+    const blocked = await rateLimit(user1Id, config);
+    expect(blocked.success).toBe(false);
+
+    // Advance time
+    vi.advanceTimersByTime(1500);
+
+    // User 1 should now be able to make requests again
+    const afterReset = await rateLimit(user1Id, config);
+    expect(afterReset.success).toBe(true);
+
+    // User 2 should have fresh limit
+    const user2Id = `user2-${Date.now()}`;
+    const user2Result = await rateLimit(user2Id, config);
+    expect(user2Result.success).toBe(true);
+    expect(user2Result.remaining).toBe(1);
+  });
+});

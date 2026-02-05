@@ -135,6 +135,55 @@ describe('LinkedIn Archive Upload API', () => {
 
       expect(response.status).toBe(500);
       expect(data.error).toBe('Failed to upload archive');
+      expect(data.details).toContain('Blob storage error');
+    });
+
+    it('should return 400 when file exceeds size limit', async () => {
+      const formData = new FormData();
+      // Create a mock file with size > 100MB
+      const largeFile = {
+        name: 'large-archive.zip',
+        size: 101 * 1024 * 1024, // 101MB
+        type: 'application/zip',
+      };
+      // Mock the file getter to return our large file
+      Object.defineProperty(formData, 'get', {
+        value: (name: string) => {
+          if (name === 'file') return largeFile as any;
+          return null;
+        },
+      });
+
+      const request = {
+        formData: () => Promise.resolve(formData),
+      } as any;
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe('File size exceeds 100MB limit');
+    });
+
+    it('should handle non-Error blob upload exception', async () => {
+      vi.mocked(put).mockRejectedValue('String upload error');
+
+      const formData = new FormData();
+      const zipContent = new Uint8Array([0x50, 0x4b, 0x03, 0x04]);
+      const file = new File([zipContent], 'archive.zip', { type: 'application/zip' });
+      formData.append('file', file);
+
+      const request = new Request('http://localhost/api/linkedin/archive/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe('Failed to upload archive');
+      expect(data.details).toContain('Unknown error');
     });
   });
 });

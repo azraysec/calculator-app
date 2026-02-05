@@ -92,7 +92,7 @@ describe('LinkedIn Debug API', () => {
       );
     });
 
-    it('should handle database errors', async () => {
+    it('should handle database errors with Error instance', async () => {
       vi.mocked(prisma.ingestJob.findMany).mockRejectedValue(new Error('Connection failed'));
 
       const response = await GET();
@@ -100,6 +100,18 @@ describe('LinkedIn Debug API', () => {
 
       expect(response.status).toBe(500);
       expect(data.error).toBe('Internal server error');
+      expect(data.details).toBe('Connection failed');
+    });
+
+    it('should handle database errors with non-Error instance', async () => {
+      vi.mocked(prisma.ingestJob.findMany).mockRejectedValue('String error');
+
+      const response = await GET();
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe('Internal server error');
+      expect(data.details).toBe('Unknown error');
     });
 
     it('should return empty data when no jobs exist', async () => {

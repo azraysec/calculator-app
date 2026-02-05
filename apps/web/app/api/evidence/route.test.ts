@@ -64,6 +64,16 @@ describe('Evidence API', () => {
       expect(data.error).toBe('edgeIds parameter is required');
     });
 
+    it('should return empty array when edgeIds contains only commas', async () => {
+      // This tests the case where split(',').filter(Boolean) results in empty array
+      const request = new Request('http://localhost/api/evidence?edgeIds=,,,');
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.edges).toEqual([]);
+    });
+
     it('should return empty array when no edges match', async () => {
       vi.mocked(prisma.edge.findMany).mockResolvedValue([]);
 

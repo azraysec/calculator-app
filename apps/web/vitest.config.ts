@@ -22,6 +22,12 @@ export default defineConfig({
         '**/.next/**',
         '**/dist/**',
         'e2e/**',
+        // Initialization/config files that are tested via integration tests
+        'lib/auth.ts',
+        'lib/prisma.ts',
+        // Export-only route files
+        'app/api/auth/[...nextauth]/route.ts',
+        'app/api/inngest/route.ts',
       ],
       thresholds: {
         lines: 90,
