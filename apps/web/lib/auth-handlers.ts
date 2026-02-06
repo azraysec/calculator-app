@@ -29,11 +29,21 @@ export async function handleGoogleSignIn(
     };
   }
 ) {
+  // First, get existing user data to preserve refresh token if not provided
+  const existingUser = await db.user.findUnique({
+    where: { id: userId },
+    select: { googleRefreshToken: true },
+  });
+
+  // Only update refresh token if a new one was provided
+  // Google only sends refresh_token on first authorization, not subsequent logins
+  const refreshTokenToStore = account.refresh_token ?? existingUser?.googleRefreshToken ?? null;
+
   // Store tokens for Gmail API access
   await db.user.update({
     where: { id: userId },
     data: {
-      googleRefreshToken: account.refresh_token ?? null,
+      googleRefreshToken: refreshTokenToStore,
       googleAccessToken: account.access_token ?? null,
       tokenExpiresAt: account.expires_at
         ? new Date(account.expires_at * 1000)
@@ -41,14 +51,8 @@ export async function handleGoogleSignIn(
     },
   });
 
-  // Check if user has stored refresh token (from current or previous login)
-  const updatedUser = await db.user.findUnique({
-    where: { id: userId },
-    select: { googleRefreshToken: true },
-  });
-
-  // Connection is CONNECTED if we have a refresh token (current or previously stored)
-  const hasRefreshToken = !!(account.refresh_token || updatedUser?.googleRefreshToken);
+  // Connection is CONNECTED if we have a refresh token (new or existing)
+  const hasRefreshToken = !!refreshTokenToStore;
 
   // Create/update DataSourceConnection for Gmail status tracking
   await db.dataSourceConnection.upsert({

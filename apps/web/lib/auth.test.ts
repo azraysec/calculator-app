@@ -30,8 +30,8 @@ describe('handleGoogleSignIn', () => {
 
   describe('Token storage', () => {
     it('should store access token and refresh token in User model', async () => {
+      mockDb.user.findUnique.mockResolvedValue({ googleRefreshToken: null });
       mockDb.user.update.mockResolvedValue({});
-      mockDb.user.findUnique.mockResolvedValue({ googleRefreshToken: 'refresh-token' });
       mockDb.dataSourceConnection.upsert.mockResolvedValue({});
 
       await handleGoogleSignIn(
@@ -54,9 +54,33 @@ describe('handleGoogleSignIn', () => {
       });
     });
 
-    it('should store null when refresh_token is not provided', async () => {
+    it('should preserve existing refresh_token when new one is not provided', async () => {
+      // User already has a stored refresh token
+      mockDb.user.findUnique.mockResolvedValue({ googleRefreshToken: 'existing-token' });
       mockDb.user.update.mockResolvedValue({});
+      mockDb.dataSourceConnection.upsert.mockResolvedValue({});
+
+      await handleGoogleSignIn(
+        'user-123',
+        {
+          access_token: 'access-token',
+          refresh_token: null, // Google doesn't send on subsequent login
+        },
+        mockDb as any
+      );
+
+      // Should preserve existing token, NOT overwrite with null
+      expect(mockDb.user.update).toHaveBeenCalledWith({
+        where: { id: 'user-123' },
+        data: expect.objectContaining({
+          googleRefreshToken: 'existing-token', // Preserved!
+        }),
+      });
+    });
+
+    it('should store null only when no existing token exists', async () => {
       mockDb.user.findUnique.mockResolvedValue({ googleRefreshToken: null });
+      mockDb.user.update.mockResolvedValue({});
       mockDb.dataSourceConnection.upsert.mockResolvedValue({});
 
       await handleGoogleSignIn(
@@ -79,8 +103,8 @@ describe('handleGoogleSignIn', () => {
 
   describe('DataSourceConnection creation - BUG FIX VERIFICATION', () => {
     it('should create CONNECTED DataSourceConnection when refresh_token is present', async () => {
+      mockDb.user.findUnique.mockResolvedValue({ googleRefreshToken: null });
       mockDb.user.update.mockResolvedValue({});
-      mockDb.user.findUnique.mockResolvedValue({ googleRefreshToken: 'refresh-token' });
       mockDb.dataSourceConnection.upsert.mockResolvedValue({});
 
       const result = await handleGoogleSignIn(
@@ -113,14 +137,14 @@ describe('handleGoogleSignIn', () => {
       });
     });
 
-    it('BUG FIX: should create CONNECTED when refresh_token is null but stored token exists', async () => {
+    it('BUG FIX: should preserve refresh_token and show CONNECTED on subsequent login', async () => {
       // This test verifies the bug fix for the Gmail "Not Connected" issue
-      // Previously, DataSourceConnection was only created when account.refresh_token was present
-      // Now it checks for stored googleRefreshToken in User model
+      // Previously, we were overwriting stored refresh_token with null
+      // Now we preserve the existing token
 
-      mockDb.user.update.mockResolvedValue({});
       // User has previously stored refresh token
       mockDb.user.findUnique.mockResolvedValue({ googleRefreshToken: 'previously-stored-token' });
+      mockDb.user.update.mockResolvedValue({});
       mockDb.dataSourceConnection.upsert.mockResolvedValue({});
 
       // Simulate subsequent login - Google doesn't send refresh_token
@@ -133,7 +157,16 @@ describe('handleGoogleSignIn', () => {
         mockDb as any
       );
 
-      // Should be CONNECTED because stored token exists
+      // Should preserve existing token
+      expect(mockDb.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            googleRefreshToken: 'previously-stored-token', // Preserved, not null!
+          }),
+        })
+      );
+
+      // Should be CONNECTED because token was preserved
       expect(result.hasRefreshToken).toBe(true);
       expect(mockDb.dataSourceConnection.upsert).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -148,9 +181,9 @@ describe('handleGoogleSignIn', () => {
     });
 
     it('should create DISCONNECTED when no refresh token exists anywhere', async () => {
-      mockDb.user.update.mockResolvedValue({});
       // User has no stored refresh token
       mockDb.user.findUnique.mockResolvedValue({ googleRefreshToken: null });
+      mockDb.user.update.mockResolvedValue({});
       mockDb.dataSourceConnection.upsert.mockResolvedValue({});
 
       const result = await handleGoogleSignIn(
@@ -176,8 +209,8 @@ describe('handleGoogleSignIn', () => {
       // This test ensures DataSourceConnection is ALWAYS created/updated
       // even when no tokens are available
 
-      mockDb.user.update.mockResolvedValue({});
       mockDb.user.findUnique.mockResolvedValue({ googleRefreshToken: null });
+      mockDb.user.update.mockResolvedValue({});
       mockDb.dataSourceConnection.upsert.mockResolvedValue({});
 
       await handleGoogleSignIn(
