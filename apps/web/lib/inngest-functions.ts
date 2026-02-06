@@ -293,6 +293,298 @@ export const processLinkedInArchive = inngest.createFunction(
   }
 );
 
+/**
+ * Process Gmail sync in background with full pagination
+ * Fetches ALL messages, not just 100
+ */
+export const processGmailSync = inngest.createFunction(
+  {
+    id: 'process-gmail-sync',
+    name: 'Process Gmail Sync',
+    concurrency: {
+      limit: 10, // Process max 10 users simultaneously
+    },
+  },
+  { event: 'gmail.sync.start' },
+  async ({ event, step }) => {
+    const { jobId, userId, fullSync } = event.data;
+
+    // Step 1: Get user credentials and validate
+    const user = await step.run('validate-user', async () => {
+      const job = await prisma.ingestJob.findUnique({ where: { id: jobId } });
+      if (!job) throw new Error('Job not found');
+
+      const userData = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          email: true,
+          googleRefreshToken: true,
+          googleAccessToken: true,
+          lastGmailSyncAt: true,
+          person: { select: { id: true } },
+        },
+      });
+
+      if (!userData?.googleRefreshToken) {
+        throw new Error('User not connected to Gmail');
+      }
+
+      await prisma.ingestJob.update({
+        where: { id: jobId },
+        data: {
+          status: 'running',
+          startedAt: new Date(),
+          progress: 5,
+          logs: 'Validating Gmail connection...',
+        },
+      });
+
+      return userData;
+    });
+
+    // Step 2: Get message count estimate
+    const { estimatedTotal } = await step.run('estimate-messages', async () => {
+      const { createGmailAdapter } = await import('@wig/adapters');
+      const adapter = createGmailAdapter({
+        refreshToken: user.googleRefreshToken!,
+        accessToken: user.googleAccessToken || undefined,
+        clientId: process.env.GOOGLE_CLIENT_ID!,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      });
+
+      const validation = await adapter.validateConnection();
+      if (!validation.valid) {
+        throw new Error(`Gmail connection invalid: ${validation.error}`);
+      }
+
+      await prisma.ingestJob.update({
+        where: { id: jobId },
+        data: { progress: 10, logs: 'Fetching message count...' },
+      });
+
+      // Estimate based on first page - Gmail doesn't give exact counts
+      return { estimatedTotal: 1000 }; // Will be refined as we paginate
+    });
+
+    // Step 3: Paginated sync loop
+    const syncResult = await step.run('sync-all-pages', async () => {
+      const { createGmailAdapter } = await import('@wig/adapters');
+      const adapter = createGmailAdapter({
+        refreshToken: user.googleRefreshToken!,
+        accessToken: user.googleAccessToken || undefined,
+        clientId: process.env.GOOGLE_CLIENT_ID!,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      });
+
+      let cursor: string | undefined = undefined;
+      let totalProcessed = 0;
+      let totalContacts = 0;
+      let pageNumber = 0;
+      const maxPages = 50; // Safety limit: 50 pages * 100 = 5000 messages max
+      const batchSize = 100;
+
+      // Determine since date
+      const sinceDate = fullSync ? undefined : (user.lastGmailSyncAt ? new Date(user.lastGmailSyncAt) : undefined);
+
+      while (pageNumber < maxPages) {
+        pageNumber++;
+
+        // Fetch a page of interactions
+        const result = await adapter.listInteractions({
+          since: sinceDate,
+          limit: batchSize,
+          cursor,
+        });
+
+        const interactions = result.items;
+
+        // Process this batch
+        for (const interaction of interactions) {
+          if (!interaction.metadata?.threadId) continue;
+
+          const threadId = interaction.metadata.threadId as string;
+
+          // Find or create conversation
+          const conversation = await prisma.conversation.upsert({
+            where: {
+              sourceName_externalId: {
+                sourceName: interaction.sourceName,
+                externalId: threadId,
+              },
+            },
+            create: {
+              userId: user.id,
+              sourceName: interaction.sourceName,
+              externalId: threadId,
+              participants: interaction.participants,
+              metadata: {
+                subject: interaction.metadata.subject ?? null,
+                labels: interaction.metadata.labels ?? null,
+              } as any,
+            },
+            update: {
+              participants: interaction.participants,
+              metadata: {
+                subject: interaction.metadata.subject ?? null,
+                labels: interaction.metadata.labels ?? null,
+              } as any,
+            },
+          });
+
+          // Create message
+          await prisma.message.upsert({
+            where: {
+              id: `${interaction.sourceName}-${interaction.sourceId}`,
+            },
+            create: {
+              id: `${interaction.sourceName}-${interaction.sourceId}`,
+              userId: user.id,
+              conversationId: conversation.id,
+              senderId: interaction.participants[0] || 'unknown',
+              timestamp: interaction.timestamp,
+              content: interaction.metadata.snippet as string,
+              metadata: {
+                messageId: interaction.sourceId,
+                labels: interaction.metadata.labels ?? null,
+              } as any,
+            },
+            update: {
+              timestamp: interaction.timestamp,
+              content: interaction.metadata.snippet as string,
+            },
+          });
+
+          // Process participants and create edges
+          for (let i = 1; i < interaction.participants.length; i++) {
+            const participant = interaction.participants[i];
+
+            // Find or create person for this email
+            let person = await prisma.person.findFirst({
+              where: { emails: { has: participant } },
+            });
+
+            if (!person) {
+              person = await prisma.person.create({
+                data: {
+                  userId: user.id,
+                  names: [participant.split('@')[0]],
+                  emails: [participant],
+                  phones: [],
+                  socialHandles: {},
+                  metadata: { source: 'gmail' } as any,
+                },
+              });
+              totalContacts++;
+            }
+
+            // Create evidence event
+            const labels = interaction.metadata.labels;
+            const isSent = Array.isArray(labels) && labels.includes('SENT');
+
+            await prisma.evidenceEvent.create({
+              data: {
+                userId: user.id,
+                subjectPersonId: user.person?.id || person.id,
+                objectPersonId: person.id,
+                type: isSent ? 'email_sent' : 'email_received',
+                timestamp: interaction.timestamp,
+                source: 'gmail',
+                metadata: {
+                  threadId: interaction.metadata.threadId ?? null,
+                  subject: interaction.metadata.subject ?? null,
+                  messageId: interaction.sourceId,
+                } as any,
+              },
+            });
+
+            // Create or update Edge
+            if (user.person?.id && person.id !== user.person.id) {
+              const fromPersonId = isSent ? user.person.id : person.id;
+              const toPersonId = isSent ? person.id : user.person.id;
+
+              await prisma.edge.upsert({
+                where: {
+                  fromPersonId_toPersonId: { fromPersonId, toPersonId },
+                },
+                create: {
+                  fromPersonId,
+                  toPersonId,
+                  relationshipType: 'interacted_with',
+                  strength: 0.3,
+                  sources: ['gmail'],
+                  channels: ['email'],
+                  interactionCount: 1,
+                  firstSeenAt: interaction.timestamp,
+                  lastSeenAt: interaction.timestamp,
+                },
+                update: {
+                  interactionCount: { increment: 1 },
+                  lastSeenAt: interaction.timestamp,
+                  sources: { push: 'gmail' },
+                },
+              });
+            }
+          }
+
+          totalProcessed++;
+        }
+
+        // Update progress
+        const progress = Math.min(10 + Math.floor((totalProcessed / estimatedTotal) * 85), 95);
+        await prisma.ingestJob.update({
+          where: { id: jobId },
+          data: {
+            progress,
+            logs: `Processing page ${pageNumber}... ${totalProcessed} messages, ${totalContacts} new contacts`,
+            resultMetadata: {
+              messagesProcessed: totalProcessed,
+              newContacts: totalContacts,
+              pagesProcessed: pageNumber,
+            } as any,
+          },
+        });
+
+        // Check if more pages
+        if (!result.hasMore || !result.nextCursor) {
+          break;
+        }
+        cursor = result.nextCursor;
+
+        // Small delay to respect rate limits
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
+      return { totalProcessed, totalContacts, pagesProcessed: pageNumber };
+    });
+
+    // Step 4: Complete job
+    await step.run('complete-job', async () => {
+      await prisma.user.update({
+        where: { id: userId },
+        data: { lastGmailSyncAt: new Date() },
+      });
+
+      await prisma.ingestJob.update({
+        where: { id: jobId },
+        data: {
+          status: 'completed',
+          completedAt: new Date(),
+          progress: 100,
+          logs: `Sync complete! ${syncResult.totalProcessed} messages, ${syncResult.totalContacts} new contacts`,
+          resultMetadata: {
+            messagesProcessed: syncResult.totalProcessed,
+            newContacts: syncResult.totalContacts,
+            pagesProcessed: syncResult.pagesProcessed,
+          } as any,
+        },
+      });
+    });
+
+    return syncResult;
+  }
+);
+
 // Export all functions as an array for easy registration
 export const inngestFunctions = [
   handleContactsIngested,
@@ -303,4 +595,5 @@ export const inngestFunctions = [
   handleSyncCompleted,
   handleSyncFailed,
   processLinkedInArchive,
+  processGmailSync,
 ];

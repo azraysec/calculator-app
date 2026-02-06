@@ -1,7 +1,26 @@
 "use client";
 
 import { useSession, signIn } from "next-auth/react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+
+interface SyncStatus {
+  syncing: boolean;
+  lastSync: string | null;
+  job: {
+    id: string;
+    status: string;
+    progress: number;
+    logs: string;
+    startedAt: string | null;
+    completedAt: string | null;
+    error: string | null;
+    result: {
+      messagesProcessed?: number;
+      newContacts?: number;
+      pagesProcessed?: number;
+    } | null;
+  } | null;
+}
 
 interface GmailConnectionProps {
   onConnectionChange?: (connected: boolean) => void;
@@ -12,15 +31,18 @@ interface GmailConnectionProps {
  *
  * Displays Gmail connection status and allows users to:
  * - Connect their Gmail account via OAuth
- * - View last sync time
- * - Trigger manual sync
- * - Disconnect their Gmail account
+ * - View sync progress in real-time
+ * - Trigger full sync with all messages
+ * - See sync statistics
  */
 export function GmailConnection({ onConnectionChange }: GmailConnectionProps) {
   const { data: session, status } = useSession();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
+  const [polling, setPolling] = useState(false);
 
+  // Fetch user data
   useEffect(() => {
     async function fetchUser() {
       if (!session?.user?.id) return;
@@ -46,23 +68,68 @@ export function GmailConnection({ onConnectionChange }: GmailConnectionProps) {
     }
   }, [session, status, onConnectionChange]);
 
+  // Fetch sync status
+  const fetchSyncStatus = useCallback(async () => {
+    try {
+      const response = await fetch('/api/gmail/sync');
+      if (response.ok) {
+        const data = await response.json();
+        setSyncStatus(data);
+        return data;
+      }
+    } catch (error) {
+      console.error('Failed to fetch sync status:', error);
+    }
+    return null;
+  }, []);
+
+  // Initial sync status fetch
+  useEffect(() => {
+    if (user?.googleRefreshToken) {
+      fetchSyncStatus();
+    }
+  }, [user, fetchSyncStatus]);
+
+  // Poll for sync status when syncing
+  useEffect(() => {
+    if (!syncStatus?.syncing || polling) return;
+
+    setPolling(true);
+    const interval = setInterval(async () => {
+      const status = await fetchSyncStatus();
+      if (!status?.syncing) {
+        clearInterval(interval);
+        setPolling(false);
+      }
+    }, 2000); // Poll every 2 seconds
+
+    return () => {
+      clearInterval(interval);
+      setPolling(false);
+    };
+  }, [syncStatus?.syncing, polling, fetchSyncStatus]);
+
   const handleConnect = async () => {
     await signIn('google', {
       callbackUrl: '/settings?gmailConnected=true',
     });
   };
 
-  const handleSync = async () => {
+  const handleSync = async (fullSync: boolean = false) => {
     try {
       setLoading(true);
-      const response = await fetch('/api/cron/gmail-sync', {
+      const response = await fetch('/api/gmail/sync', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fullSync }),
       });
 
       if (response.ok) {
-        alert('Gmail sync started! This may take a few minutes.');
+        // Immediately fetch status to start showing progress
+        await fetchSyncStatus();
       } else {
-        alert('Failed to start sync. Please try again.');
+        const error = await response.json();
+        alert(error.error || 'Failed to start sync. Please try again.');
       }
     } catch (error) {
       console.error('Sync error:', error);
@@ -82,7 +149,10 @@ export function GmailConnection({ onConnectionChange }: GmailConnectionProps) {
   }
 
   const isConnected = !!user?.googleRefreshToken;
-  const lastSyncAt = user?.lastGmailSyncAt
+  const isSyncing = syncStatus?.syncing || false;
+  const lastSyncAt = syncStatus?.lastSync
+    ? new Date(syncStatus.lastSync)
+    : user?.lastGmailSyncAt
     ? new Date(user.lastGmailSyncAt)
     : null;
 
@@ -103,7 +173,9 @@ export function GmailConnection({ onConnectionChange }: GmailConnectionProps) {
           <div>
             <h3 className="text-lg font-semibold text-gray-900">Gmail</h3>
             <p className="text-sm text-gray-600">
-              {isConnected
+              {isSyncing
+                ? 'Syncing your emails...'
+                : isConnected
                 ? 'Connected - Email evidence is being synced'
                 : 'Connect to import email interactions'}
             </p>
@@ -112,46 +184,112 @@ export function GmailConnection({ onConnectionChange }: GmailConnectionProps) {
 
         <div
           className={`px-3 py-1 rounded-full text-sm font-medium ${
-            isConnected
+            isSyncing
+              ? 'bg-blue-100 text-blue-800'
+              : isConnected
               ? 'bg-green-100 text-green-800'
               : 'bg-gray-100 text-gray-800'
           }`}
         >
-          {isConnected ? 'Connected' : 'Not Connected'}
+          {isSyncing ? 'Syncing...' : isConnected ? 'Connected' : 'Not Connected'}
         </div>
       </div>
+
+      {/* Sync Progress Bar */}
+      {isSyncing && syncStatus?.job && (
+        <div className="mt-4 space-y-2">
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-600">{syncStatus.job.logs}</span>
+            <span className="text-gray-900 font-medium">{syncStatus.job.progress}%</span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-2.5">
+            <div
+              className="bg-blue-600 h-2.5 rounded-full transition-all duration-500"
+              style={{ width: `${syncStatus.job.progress}%` }}
+            ></div>
+          </div>
+          {syncStatus.job.result && (
+            <div className="flex gap-4 text-xs text-gray-500">
+              {syncStatus.job.result.messagesProcessed !== undefined && (
+                <span>{syncStatus.job.result.messagesProcessed} messages</span>
+              )}
+              {syncStatus.job.result.newContacts !== undefined && (
+                <span>{syncStatus.job.result.newContacts} new contacts</span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Sync Completed Status */}
+      {!isSyncing && syncStatus?.job?.status === 'completed' && syncStatus.job.result && (
+        <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-200">
+          <div className="flex items-center gap-2 text-green-800">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            <span className="font-medium">Last sync complete</span>
+          </div>
+          <div className="mt-1 text-sm text-green-700">
+            {syncStatus.job.result.messagesProcessed} messages processed,{' '}
+            {syncStatus.job.result.newContacts} new contacts found
+          </div>
+        </div>
+      )}
+
+      {/* Sync Error Status */}
+      {!isSyncing && syncStatus?.job?.status === 'failed' && (
+        <div className="mt-4 p-3 bg-red-50 rounded-lg border border-red-200">
+          <div className="flex items-center gap-2 text-red-800">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            <span className="font-medium">Sync failed</span>
+          </div>
+          <div className="mt-1 text-sm text-red-700">
+            {syncStatus.job.error || 'An error occurred during sync'}
+          </div>
+        </div>
+      )}
 
       {isConnected ? (
         <div className="mt-6 space-y-4">
           <div className="flex items-center justify-between text-sm">
             <span className="text-gray-600">Last synced:</span>
             <span className="text-gray-900 font-medium">
-              {lastSyncAt
-                ? lastSyncAt.toLocaleString()
-                : 'Never'}
+              {lastSyncAt ? lastSyncAt.toLocaleString() : 'Never'}
             </span>
           </div>
 
           <div className="flex gap-3">
             <button
-              onClick={handleSync}
-              disabled={loading}
+              onClick={() => handleSync(false)}
+              disabled={loading || isSyncing}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {loading ? 'Syncing...' : 'Sync Now'}
+              {isSyncing ? 'Syncing...' : 'Sync New Emails'}
+            </button>
+
+            <button
+              onClick={() => handleSync(true)}
+              disabled={loading || isSyncing}
+              className="px-4 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Full Sync
             </button>
 
             <button
               onClick={handleConnect}
-              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              disabled={isSyncing}
+              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
             >
               Reconnect
             </button>
           </div>
 
           <p className="text-xs text-gray-500">
-            Automatic sync runs every 15 minutes. Manual sync will fetch the
-            latest emails immediately.
+            <strong>Sync New Emails:</strong> Fetches emails since last sync.{' '}
+            <strong>Full Sync:</strong> Re-imports all emails (may take longer).
           </p>
         </div>
       ) : (

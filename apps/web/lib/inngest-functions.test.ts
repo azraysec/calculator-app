@@ -64,10 +64,10 @@ describe('Inngest Functions', () => {
     expect(Array.isArray(inngestFunctions)).toBe(true);
   });
 
-  it('should export 8 functions', async () => {
+  it('should export 9 functions', async () => {
     const { inngestFunctions } = await import('./inngest-functions');
 
-    expect(inngestFunctions).toHaveLength(8);
+    expect(inngestFunctions).toHaveLength(9);
   });
 
   it('should export handleContactsIngested function', async () => {
