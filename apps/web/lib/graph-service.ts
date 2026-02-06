@@ -30,21 +30,46 @@ export function createGraphService(userId: string) {
 
     getOutgoingEdges: async (personId) => {
       // CRITICAL: Only return edges where both people belong to the user
-      // The fromPerson filter ensures tenant isolation without a separate query
-      const results = await prisma.edge.findMany({
-        where: {
-          fromPersonId: personId,
-          // Ensure both fromPerson and toPerson belong to this user
-          fromPerson: { userId },
-          toPerson: { userId }
-        },
-        orderBy: { strength: 'desc' },
-      });
+      // Treat edges as BIDIRECTIONAL - include both outgoing and incoming
+      // This is necessary because LinkedIn connections are bidirectional relationships
+      const [outgoing, incoming] = await Promise.all([
+        prisma.edge.findMany({
+          where: {
+            fromPersonId: personId,
+            fromPerson: { userId },
+            toPerson: { userId }
+          },
+          orderBy: { strength: 'desc' },
+        }),
+        prisma.edge.findMany({
+          where: {
+            toPersonId: personId,
+            fromPerson: { userId },
+            toPerson: { userId }
+          },
+          orderBy: { strength: 'desc' },
+        }),
+      ]);
 
-      return results.map(edge => ({
+      // Convert incoming edges to "outgoing" by swapping from/to
+      const incomingAsOutgoing = incoming.map(edge => ({
         ...edge,
+        fromPersonId: edge.toPersonId,
+        toPersonId: edge.fromPersonId,
         strengthFactors: edge.strengthFactors as any,
       } as Edge));
+
+      // Combine and deduplicate (prefer original direction if both exist)
+      const seen = new Set(outgoing.map(e => e.toPersonId));
+      const combined = [
+        ...outgoing.map(edge => ({
+          ...edge,
+          strengthFactors: edge.strengthFactors as any,
+        } as Edge)),
+        ...incomingAsOutgoing.filter(e => !seen.has(e.toPersonId)),
+      ];
+
+      return combined;
     },
 
     getIncomingEdges: async (personId) => {
@@ -103,28 +128,73 @@ export function createGraphService(userId: string) {
     getOutgoingEdgesForMany: async (personIds: string[]) => {
       if (personIds.length === 0) return new Map();
 
-      const results = await prisma.edge.findMany({
-        where: {
-          fromPersonId: { in: personIds },
-          fromPerson: { userId },
-          toPerson: { userId }
-        },
-        orderBy: { strength: 'desc' },
-      });
+      // Fetch both outgoing AND incoming edges (bidirectional)
+      const [outgoing, incoming] = await Promise.all([
+        prisma.edge.findMany({
+          where: {
+            fromPersonId: { in: personIds },
+            fromPerson: { userId },
+            toPerson: { userId }
+          },
+          orderBy: { strength: 'desc' },
+        }),
+        prisma.edge.findMany({
+          where: {
+            toPersonId: { in: personIds },
+            fromPerson: { userId },
+            toPerson: { userId }
+          },
+          orderBy: { strength: 'desc' },
+        }),
+      ]);
 
-      // Group by fromPersonId
+      // Initialize map with empty arrays
       const edgeMap = new Map<string, Edge[]>();
+      const seenTargets = new Map<string, Set<string>>(); // personId -> set of target ids
+
       for (const personId of personIds) {
         edgeMap.set(personId, []);
+        seenTargets.set(personId, new Set());
       }
-      for (const edge of results) {
+
+      // Add outgoing edges
+      for (const edge of outgoing) {
         const edges = edgeMap.get(edge.fromPersonId) || [];
+        const seen = seenTargets.get(edge.fromPersonId) || new Set();
+
         edges.push({
           ...edge,
           strengthFactors: edge.strengthFactors as any,
         } as Edge);
+        seen.add(edge.toPersonId);
+
         edgeMap.set(edge.fromPersonId, edges);
+        seenTargets.set(edge.fromPersonId, seen);
       }
+
+      // Add incoming edges as "outgoing" (bidirectional)
+      for (const edge of incoming) {
+        const sourcePersonId = edge.toPersonId; // The person we're looking for edges from
+        if (!personIds.includes(sourcePersonId)) continue;
+
+        const edges = edgeMap.get(sourcePersonId) || [];
+        const seen = seenTargets.get(sourcePersonId) || new Set();
+
+        // Only add if we haven't already added an edge to this target
+        if (!seen.has(edge.fromPersonId)) {
+          edges.push({
+            ...edge,
+            fromPersonId: edge.toPersonId, // Swap direction
+            toPersonId: edge.fromPersonId,
+            strengthFactors: edge.strengthFactors as any,
+          } as Edge);
+          seen.add(edge.fromPersonId);
+        }
+
+        edgeMap.set(sourcePersonId, edges);
+        seenTargets.set(sourcePersonId, seen);
+      }
+
       return edgeMap;
     },
 
