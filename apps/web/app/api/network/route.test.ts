@@ -15,10 +15,16 @@ vi.mock('@/lib/prisma', () => ({
   prisma: {
     person: {
       findMany: vi.fn(),
+      count: vi.fn(),
+      groupBy: vi.fn(),
     },
     edge: {
       findMany: vi.fn(),
     },
+    organization: {
+      findMany: vi.fn(),
+    },
+    $queryRaw: vi.fn(),
   },
 }));
 
@@ -39,6 +45,16 @@ describe('Network API', () => {
     vi.mocked(auth).mockResolvedValue({
       user: { id: mockUserId },
     } as any);
+
+    // Default mocks for all prisma methods
+    vi.mocked(prisma.person.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.person.count).mockResolvedValue(0);
+    vi.mocked(prisma.person.groupBy).mockResolvedValue([]);
+    vi.mocked(prisma.$queryRaw).mockResolvedValue([
+      { total: BigInt(0), strong: BigInt(0), medium: BigInt(0), weak: BigInt(0) },
+    ]);
+    vi.mocked(prisma.organization.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.edge.findMany).mockResolvedValue([]);
   });
 
   describe('GET /api/network', () => {
@@ -88,6 +104,17 @@ describe('Network API', () => {
       ];
 
       vi.mocked(prisma.person.findMany).mockResolvedValue(mockPeople as any);
+      vi.mocked(prisma.person.count).mockResolvedValue(2);
+      vi.mocked(prisma.$queryRaw).mockResolvedValue([
+        { total: BigInt(1), strong: BigInt(1), medium: BigInt(0), weak: BigInt(0) },
+      ]);
+      vi.mocked(prisma.person.groupBy).mockResolvedValue([
+        { organizationId: 'org-1', _count: 1 },
+        { organizationId: null, _count: 1 },
+      ] as any);
+      vi.mocked(prisma.organization.findMany).mockResolvedValue([
+        { id: 'org-1', name: 'Company A' },
+      ] as any);
       vi.mocked(prisma.edge.findMany).mockResolvedValue(mockEdges as any);
 
       const response = await GET(createRequest());
@@ -102,9 +129,6 @@ describe('Network API', () => {
     });
 
     it('should filter by userId for multi-tenant isolation', async () => {
-      vi.mocked(prisma.person.findMany).mockResolvedValue([]);
-      vi.mocked(prisma.edge.findMany).mockResolvedValue([]);
-
       await GET(createRequest());
 
       expect(prisma.person.findMany).toHaveBeenCalledWith(
@@ -124,7 +148,7 @@ describe('Network API', () => {
       ];
 
       vi.mocked(prisma.person.findMany).mockResolvedValue(mockPeople as any);
-      vi.mocked(prisma.edge.findMany).mockResolvedValue([]);
+      vi.mocked(prisma.person.count).mockResolvedValue(2);
 
       await GET(createRequest());
 
@@ -144,6 +168,10 @@ describe('Network API', () => {
         { id: 'p2', names: [], emails: [], phones: [], organization: null },
         { id: 'p3', names: [], emails: [], phones: [], organization: null },
       ] as any);
+      vi.mocked(prisma.person.count).mockResolvedValue(3);
+      vi.mocked(prisma.$queryRaw).mockResolvedValue([
+        { total: BigInt(3), strong: BigInt(1), medium: BigInt(1), weak: BigInt(1) },
+      ]);
 
       vi.mocked(prisma.edge.findMany).mockResolvedValue([
         { id: 'e1', fromPersonId: 'p1', toPersonId: 'p2', strength: 0.9, channels: [], interactionCount: 5, lastSeenAt: new Date() },
@@ -165,7 +193,14 @@ describe('Network API', () => {
         { id: 'p2', names: ['B'], emails: [], phones: [], organization: { id: 'org-1', name: 'Company A' } },
         { id: 'p3', names: ['C'], emails: [], phones: [], organization: null },
       ] as any);
-      vi.mocked(prisma.edge.findMany).mockResolvedValue([]);
+      vi.mocked(prisma.person.count).mockResolvedValue(3);
+      vi.mocked(prisma.person.groupBy).mockResolvedValue([
+        { organizationId: 'org-1', _count: 2 },
+        { organizationId: null, _count: 1 },
+      ] as any);
+      vi.mocked(prisma.organization.findMany).mockResolvedValue([
+        { id: 'org-1', name: 'Company A' },
+      ] as any);
 
       const response = await GET(createRequest());
       const data = await response.json();
@@ -180,27 +215,27 @@ describe('Network API', () => {
       const response = await GET(createRequest());
       const data = await response.json();
 
-      // The route catches errors and returns empty arrays
-      expect(response.status).toBe(200);
-      expect(data.people).toEqual([]);
+      // The route catches errors and returns 500
+      expect(response.status).toBe(500);
+      expect(data.error).toBe('Failed to fetch network data');
     });
 
     it('should handle database errors for edges', async () => {
       vi.mocked(prisma.person.findMany).mockResolvedValue([
         { id: 'p1', names: [], emails: [], phones: [], organization: null },
       ] as any);
+      vi.mocked(prisma.person.count).mockResolvedValue(1);
       vi.mocked(prisma.edge.findMany).mockRejectedValue(new Error('DB error'));
 
       const response = await GET(createRequest());
       const data = await response.json();
 
-      expect(response.status).toBe(200);
-      expect(data.edges).toEqual([]);
+      expect(response.status).toBe(500);
+      expect(data.error).toBe('Failed to fetch network data');
     });
 
     it('should handle empty network', async () => {
-      vi.mocked(prisma.person.findMany).mockResolvedValue([]);
-      vi.mocked(prisma.edge.findMany).mockResolvedValue([]);
+      // Default mocks already return empty arrays/0 values
 
       const response = await GET(createRequest());
       const data = await response.json();
@@ -248,6 +283,7 @@ describe('Network API', () => {
           organization: null,
         },
       ] as any);
+      vi.mocked(prisma.person.count).mockResolvedValue(1);
       vi.mocked(prisma.edge.findMany).mockResolvedValue([
         {
           id: 'e1',

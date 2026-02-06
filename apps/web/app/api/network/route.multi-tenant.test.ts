@@ -19,10 +19,16 @@ vi.mock('@/lib/prisma', () => ({
   prisma: {
     person: {
       findMany: vi.fn(),
+      count: vi.fn(),
+      groupBy: vi.fn(),
     },
     edge: {
       findMany: vi.fn(),
     },
+    organization: {
+      findMany: vi.fn(),
+    },
+    $queryRaw: vi.fn(),
   },
 }));
 
@@ -83,11 +89,29 @@ describe('GET /api/network - Multi-tenant isolation', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default mocks for all prisma methods
+    vi.mocked(prisma.person.count).mockResolvedValue(0);
+    vi.mocked(prisma.person.groupBy).mockResolvedValue([]);
+    vi.mocked(prisma.$queryRaw).mockResolvedValue([
+      { total: BigInt(0), strong: BigInt(0), medium: BigInt(0), weak: BigInt(0) },
+    ]);
+    vi.mocked(prisma.organization.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.edge.findMany).mockResolvedValue([]);
   });
 
   it('should only return people belonging to the authenticated user', async () => {
     vi.mocked(auth).mockResolvedValue({ user: { id: user1Id } } as any);
     vi.mocked(prisma.person.findMany).mockResolvedValue(user1People);
+    vi.mocked(prisma.person.count).mockResolvedValue(2);
+    vi.mocked(prisma.$queryRaw).mockResolvedValue([
+      { total: BigInt(1), strong: BigInt(1), medium: BigInt(0), weak: BigInt(0) },
+    ]);
+    vi.mocked(prisma.person.groupBy).mockResolvedValue([
+      { organizationId: 'org-1', _count: 2 },
+    ] as any);
+    vi.mocked(prisma.organization.findMany).mockResolvedValue([
+      { id: 'org-1', name: 'Company A' },
+    ] as any);
     vi.mocked(prisma.edge.findMany).mockResolvedValue(user1Edges);
 
     const request = new Request('http://localhost/api/network');
@@ -96,18 +120,14 @@ describe('GET /api/network - Multi-tenant isolation', () => {
     const data = await response.json();
 
     // Verify prisma was called with userId filter
-    expect(prisma.person.findMany).toHaveBeenCalledWith({
-      where: {
-        userId: user1Id,
-        deletedAt: null,
-      },
-      include: {
-        organization: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
+    expect(prisma.person.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          userId: user1Id,
+          deletedAt: null,
+        }),
+      })
+    );
 
     expect(data.people).toHaveLength(2);
     expect(data.people[0].id).toBe('person-1');
@@ -117,6 +137,16 @@ describe('GET /api/network - Multi-tenant isolation', () => {
   it('should only return edges between users own people', async () => {
     vi.mocked(auth).mockResolvedValue({ user: { id: user1Id } } as any);
     vi.mocked(prisma.person.findMany).mockResolvedValue(user1People);
+    vi.mocked(prisma.person.count).mockResolvedValue(2);
+    vi.mocked(prisma.$queryRaw).mockResolvedValue([
+      { total: BigInt(1), strong: BigInt(1), medium: BigInt(0), weak: BigInt(0) },
+    ]);
+    vi.mocked(prisma.person.groupBy).mockResolvedValue([
+      { organizationId: 'org-1', _count: 2 },
+    ] as any);
+    vi.mocked(prisma.organization.findMany).mockResolvedValue([
+      { id: 'org-1', name: 'Company A' },
+    ] as any);
     vi.mocked(prisma.edge.findMany).mockResolvedValue(user1Edges);
 
     const request = new Request('http://localhost/api/network');
@@ -125,15 +155,14 @@ describe('GET /api/network - Multi-tenant isolation', () => {
     const data = await response.json();
 
     // Verify edges are filtered to only connect user's people
-    expect(prisma.edge.findMany).toHaveBeenCalledWith({
-      where: {
-        fromPersonId: { in: ['person-1', 'person-2'] },
-        toPersonId: { in: ['person-1', 'person-2'] },
-      },
-      orderBy: {
-        strength: 'desc',
-      },
-    });
+    expect(prisma.edge.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          fromPersonId: { in: ['person-1', 'person-2'] },
+          toPersonId: { in: ['person-1', 'person-2'] },
+        }),
+      })
+    );
 
     expect(data.edges).toHaveLength(1);
     expect(data.edges[0].id).toBe('edge-1');
@@ -142,6 +171,16 @@ describe('GET /api/network - Multi-tenant isolation', () => {
   it('should calculate statistics scoped to user data', async () => {
     vi.mocked(auth).mockResolvedValue({ user: { id: user1Id } } as any);
     vi.mocked(prisma.person.findMany).mockResolvedValue(user1People);
+    vi.mocked(prisma.person.count).mockResolvedValue(2);
+    vi.mocked(prisma.$queryRaw).mockResolvedValue([
+      { total: BigInt(1), strong: BigInt(1), medium: BigInt(0), weak: BigInt(0) },
+    ]);
+    vi.mocked(prisma.person.groupBy).mockResolvedValue([
+      { organizationId: 'org-1', _count: 2 },
+    ] as any);
+    vi.mocked(prisma.organization.findMany).mockResolvedValue([
+      { id: 'org-1', name: 'Company A' },
+    ] as any);
     vi.mocked(prisma.edge.findMany).mockResolvedValue(user1Edges);
 
     const request = new Request('http://localhost/api/network');
@@ -176,6 +215,13 @@ describe('GET /api/network - Multi-tenant isolation', () => {
 
     vi.mocked(auth).mockResolvedValue({ user: { id: user1Id } } as any);
     vi.mocked(prisma.person.findMany).mockResolvedValue(user1People);
+    vi.mocked(prisma.person.count).mockResolvedValue(2);
+    vi.mocked(prisma.person.groupBy).mockResolvedValue([
+      { organizationId: 'org-1', _count: 2 },
+    ] as any);
+    vi.mocked(prisma.organization.findMany).mockResolvedValue([
+      { id: 'org-1', name: 'Company A' },
+    ] as any);
     // Mock edge query that should filter out cross-tenant edges
     vi.mocked(prisma.edge.findMany).mockResolvedValue([]);
 
@@ -183,15 +229,14 @@ describe('GET /api/network - Multi-tenant isolation', () => {
     const response = await GET(request, {});
 
     // Verify edge query filters by user's person IDs on both sides
-    expect(prisma.edge.findMany).toHaveBeenCalledWith({
-      where: {
-        fromPersonId: { in: user1PeopleIds },
-        toPersonId: { in: user1PeopleIds },
-      },
-      orderBy: {
-        strength: 'desc',
-      },
-    });
+    expect(prisma.edge.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          fromPersonId: { in: user1PeopleIds },
+          toPersonId: { in: user1PeopleIds },
+        }),
+      })
+    );
 
     const data = await response.json();
     expect(data.edges).toHaveLength(0); // Cross-tenant edge should not appear
@@ -200,6 +245,16 @@ describe('GET /api/network - Multi-tenant isolation', () => {
   it('should group people by organization within tenant scope', async () => {
     vi.mocked(auth).mockResolvedValue({ user: { id: user1Id } } as any);
     vi.mocked(prisma.person.findMany).mockResolvedValue(user1People);
+    vi.mocked(prisma.person.count).mockResolvedValue(2);
+    vi.mocked(prisma.$queryRaw).mockResolvedValue([
+      { total: BigInt(1), strong: BigInt(1), medium: BigInt(0), weak: BigInt(0) },
+    ]);
+    vi.mocked(prisma.person.groupBy).mockResolvedValue([
+      { organizationId: 'org-1', _count: 2 },
+    ] as any);
+    vi.mocked(prisma.organization.findMany).mockResolvedValue([
+      { id: 'org-1', name: 'Company A' },
+    ] as any);
     vi.mocked(prisma.edge.findMany).mockResolvedValue(user1Edges);
 
     const request = new Request('http://localhost/api/network');
