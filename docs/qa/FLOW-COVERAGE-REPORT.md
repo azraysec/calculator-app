@@ -19,11 +19,11 @@
 ### Test Infrastructure
 | Test Type | Files | Tests | Notes |
 |-----------|-------|-------|-------|
-| Unit Tests (web) | 38 | 407 | API routes, lib, adapters |
+| Unit Tests (web) | 39 | 414 | API routes, lib, adapters, auth |
 | Unit Tests (core) | 3 | 78 | PathFinder, entity resolution, scoring |
 | Integration Tests | 2 | - | LinkedIn parser only |
-| E2E Tests | 11 | 98 | Playwright specs |
-| **Total** | **54** | **583** | |
+| E2E Tests | 12 | 102 | Playwright specs (added version display) |
+| **Total** | **56** | **594** | |
 
 ---
 
@@ -120,6 +120,7 @@
 | LinkedInRelationshipScorer | packages/core/src/scoring/linkedin-scorer.ts | ⚠️ Needs integration tests |
 | Base scorer | packages/core/src/scoring/base-scorer.ts | ✅ FIXED - 30 tests |
 | Entity resolution | packages/core/src/entity-resolution.ts | ✅ FIXED - 29 tests |
+| Auth signIn handler | apps/web/lib/auth-handlers.ts | ✅ FIXED - 7 tests |
 
 ### 3. Missing Integration Tests 🟡
 | Component | Priority | Status |
@@ -201,6 +202,29 @@ Full flow definitions with all details: `docs/qa/FLOW-REGISTRY.yaml`
 
 ---
 
+## Lessons Learned
+
+### 2026-02-06: Gmail "Not Connected" Bug (P0)
+
+**Bug:** Gmail showed "Not Connected" even after successful OAuth flow.
+
+**Root Cause:** `auth.ts` only created `DataSourceConnection` when `refresh_token` was present. Google doesn't always send `refresh_token` on subsequent logins.
+
+**Why QA Missed It:**
+1. Unit tests only covered `auth.config.ts` (Edge config), not `auth.ts` (signIn event)
+2. E2E tests skipped when Gmail wasn't already connected
+3. Flow registry tracked "Gmail Connection Status" UI, not "OAuth callback creates DataSourceConnection"
+
+**QA Rule Added:** For OAuth integrations, test ALL token scenarios:
+- First login (all tokens present)
+- Subsequent login (refresh_token absent)
+- Token refresh failure
+- Revoked access
+
+**Tests Added:** `auth.test.ts` - 7 tests covering DataSourceConnection creation logic
+
+---
+
 ## Next QA Manager Tasks
 
 1. [ ] Weekly: Regenerate this report after test additions
@@ -208,3 +232,4 @@ Full flow definitions with all details: `docs/qa/FLOW-REGISTRY.yaml`
 3. [ ] Update FLOW-REGISTRY.yaml when new flows are added
 4. [ ] Track test execution times and flakiness
 5. [ ] Maintain test requirements documentation
+6. [x] Document lessons learned from production bugs
