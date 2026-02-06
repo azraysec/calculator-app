@@ -74,7 +74,7 @@ export const GET = withAuth(async (_request: Request, { userId }) => {
     ]);
 
     // Process edge stats (convert BigInt to number)
-    const edgeCounts = edgeStats[0] || { total: 0n, strong: 0n, medium: 0n, weak: 0n };
+    const edgeCounts = edgeStats[0] || { total: BigInt(0), strong: BigInt(0), medium: BigInt(0), weak: BigInt(0) };
     const totalConnections = Number(edgeCounts.total);
     const strongConnections = Number(edgeCounts.strong);
     const mediumConnections = Number(edgeCounts.medium);
