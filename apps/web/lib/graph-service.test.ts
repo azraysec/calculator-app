@@ -109,7 +109,10 @@ describe('createGraphService', () => {
   describe('getOutgoingEdges callback', () => {
     it('should return empty array when no edges found', async () => {
       createGraphService(mockUserId);
-      vi.mocked(prisma.edge.findMany).mockResolvedValue([]);
+      // Both outgoing and incoming queries return empty
+      vi.mocked(prisma.edge.findMany)
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
 
       const result = await capturedCallbacks.getOutgoingEdges('person-123');
 
@@ -118,13 +121,17 @@ describe('createGraphService', () => {
 
     it('should return edges with multi-tenant filter on both persons', async () => {
       createGraphService(mockUserId);
-      vi.mocked(prisma.edge.findMany).mockResolvedValue([
-        { id: 'edge-1', fromPersonId: 'person-123', toPersonId: 'person-456', strengthFactors: {} },
-      ] as any);
+      // Mock outgoing edges (first call) and incoming edges (second call) - bidirectional support
+      vi.mocked(prisma.edge.findMany)
+        .mockResolvedValueOnce([
+          { id: 'edge-1', fromPersonId: 'person-123', toPersonId: 'person-456', strengthFactors: {} },
+        ] as any)
+        .mockResolvedValueOnce([]); // No incoming edges
 
       const result = await capturedCallbacks.getOutgoingEdges('person-123');
 
       expect(result).toHaveLength(1);
+      // First call should query outgoing edges
       expect(prisma.edge.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
@@ -134,6 +141,23 @@ describe('createGraphService', () => {
           }),
         })
       );
+    });
+
+    it('should include incoming edges as bidirectional (swapped from/to)', async () => {
+      createGraphService(mockUserId);
+      // Mock outgoing (empty) and incoming (one edge)
+      vi.mocked(prisma.edge.findMany)
+        .mockResolvedValueOnce([]) // No outgoing edges
+        .mockResolvedValueOnce([
+          { id: 'edge-2', fromPersonId: 'person-456', toPersonId: 'person-123', strengthFactors: {} },
+        ] as any);
+
+      const result = await capturedCallbacks.getOutgoingEdges('person-123');
+
+      expect(result).toHaveLength(1);
+      // The incoming edge should be swapped to look like an outgoing edge
+      expect(result[0].fromPersonId).toBe('person-123');
+      expect(result[0].toPersonId).toBe('person-456');
     });
   });
 
