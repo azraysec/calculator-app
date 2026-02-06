@@ -55,11 +55,18 @@ export class PathFinder {
       return person;
     };
 
+    // Get starting person
+    const startPerson = await getCachedPerson(fromPersonId);
+    if (!startPerson) {
+      // Source person not found - return empty paths
+      return [];
+    }
+
     // BFS frontier: array of path nodes
     let frontier: PathNode[][] = [
       [
         {
-          person: (await getCachedPerson(fromPersonId))!,
+          person: startPerson,
           depth: 0,
           cumulativeScore: 1.0,
         },
