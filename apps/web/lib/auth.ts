@@ -87,26 +87,35 @@ const fullAuthConfig = {
           });
 
           // Create/update DataSourceConnection for Gmail status tracking
-          if (account.refresh_token) {
-            await prisma.dataSourceConnection.upsert({
-              where: {
-                userId_sourceType: {
-                  userId: user.id,
-                  sourceType: "EMAIL",
-                },
-              },
-              update: {
-                connectionStatus: "CONNECTED",
-                updatedAt: new Date(),
-              },
-              create: {
+          // Always update when signing in with Google - we have tokens in User model
+          // Note: refresh_token may be null on subsequent logins, but we still have
+          // the previously stored token in googleRefreshToken field
+          const updatedUser = await prisma.user.findUnique({
+            where: { id: user.id },
+            select: { googleRefreshToken: true },
+          });
+
+          // Connection is CONNECTED if we have a refresh token (current or previously stored)
+          const hasRefreshToken = !!(account.refresh_token || updatedUser?.googleRefreshToken);
+
+          await prisma.dataSourceConnection.upsert({
+            where: {
+              userId_sourceType: {
                 userId: user.id,
                 sourceType: "EMAIL",
-                connectionStatus: "CONNECTED",
-                privacyLevel: "PRIVATE",
               },
-            });
-          }
+            },
+            update: {
+              connectionStatus: hasRefreshToken ? "CONNECTED" : "DISCONNECTED",
+              updatedAt: new Date(),
+            },
+            create: {
+              userId: user.id,
+              sourceType: "EMAIL",
+              connectionStatus: hasRefreshToken ? "CONNECTED" : "DISCONNECTED",
+              privacyLevel: "PRIVATE",
+            },
+          });
         } catch (error) {
           console.error("Failed to store OAuth tokens:", error);
         }
