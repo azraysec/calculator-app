@@ -1,0 +1,1145 @@
+# WIG (Warm Intro Graph) Application Flow Registry
+# Generated: 2026-02-06
+# This document maps all flows in the application for QA purposes
+# Categories: user (user-facing), api (API routes), system (background jobs)
+# Priorities: P0 (critical), P1 (high), P2 (medium), P3 (low)
+
+flows:
+
+  # ============================================================================
+  # AUTHENTICATION FLOWS
+  # ============================================================================
+
+  - flow_id: auth_google_oauth
+    flow_name: Google OAuth Login
+    category: user
+    priority: P0
+    description: User logs in via Google OAuth, session created, tokens stored for Gmail access
+    entry_points:
+      - apps/web/app/api/auth/[...nextauth]/route.ts
+      - apps/web/lib/auth.ts
+      - apps/web/lib/auth.config.ts
+    happy_path_steps:
+      - User clicks Sign in with Google button on /login
+      - User redirected to Google consent screen
+      - Google redirects back with authorization code
+      - NextAuth exchanges code for tokens (access_token, refresh_token)
+      - PrismaAdapter creates/updates User record
+      - OAuth tokens stored in User model for Gmail API access
+      - DataSourceConnection created/updated for EMAIL source
+      - JWT session token created
+      - User redirected to callback URL or home
+    error_paths:
+      - Google denies consent (AccessDenied error)
+      - Invalid OAuth configuration
+      - Token exchange failure
+      - Database error during user creation
+      - Account linking conflict
+    tests:
+      unit: []
+      integration: []
+      e2e:
+        - apps/web/e2e/authentication.spec.ts
+    coverage_status: partial
+    notes: E2E tests cover UI and redirect behavior. Missing unit tests for token refresh.
+
+  - flow_id: auth_logout
+    flow_name: User Logout
+    category: user
+    priority: P1
+    description: User signs out and session is destroyed
+    entry_points:
+      - apps/web/app/api/auth/[...nextauth]/route.ts
+    happy_path_steps:
+      - User clicks sign out
+      - Session cookie cleared
+      - User redirected to login page
+    error_paths:
+      - Session already expired
+    tests:
+      unit: []
+      integration: []
+      e2e:
+        - apps/web/e2e/authentication.spec.ts
+    coverage_status: partial
+
+  - flow_id: auth_session_validation
+    flow_name: Session Validation on Protected Routes
+    category: api
+    priority: P0
+    description: API routes and pages validate user session before processing
+    entry_points:
+      - apps/web/lib/auth-helpers.ts
+    happy_path_steps:
+      - Request arrives at protected endpoint
+      - withAuth helper extracts session from JWT
+      - userId extracted from session.user.id
+      - Request processed with userId for multi-tenant isolation
+    error_paths:
+      - No session cookie (401 Unauthorized)
+      - Invalid/expired JWT (401 Unauthorized)
+    tests:
+      unit: []
+      integration: []
+      e2e:
+        - apps/web/e2e/authentication.spec.ts
+    coverage_status: partial
+
+  - flow_id: auth_error_handling
+    flow_name: Authentication Error Display
+    category: user
+    priority: P2
+    description: Display authentication errors to users
+    entry_points:
+      - apps/web/app/auth/error/page.tsx
+    happy_path_steps:
+      - User redirected to /auth/error with error query param
+      - Error type parsed and message displayed
+      - Try Again and Go Home links shown
+    error_paths:
+      - Unknown error type shows generic message
+    tests:
+      unit: []
+      integration: []
+      e2e:
+        - apps/web/e2e/authentication.spec.ts
+    coverage_status: good
+
+  # ============================================================================
+  # LINKEDIN IMPORT FLOWS
+  # ============================================================================
+
+  - flow_id: linkedin_archive_upload
+    flow_name: LinkedIn Archive Upload
+    category: user
+    priority: P0
+    description: User uploads LinkedIn data export ZIP file
+    entry_points:
+      - apps/web/app/api/linkedin/archive/upload/route.ts
+    happy_path_steps:
+      - User selects LinkedIn archive ZIP file in UI
+      - File uploaded via multipart/form-data POST
+      - File validated (type=ZIP, size<=100MB)
+      - File stored to Vercel Blob Storage
+      - IngestJob record created with status=queued
+      - JobId returned to client
+    error_paths:
+      - No file provided (400)
+      - File not ZIP format (400)
+      - File too large >100MB (400)
+      - Blob storage upload failure (500)
+      - User not authenticated (401)
+    tests:
+      unit:
+        - apps/web/app/api/linkedin/archive/upload/route.test.ts
+      integration: []
+      e2e:
+        - apps/web/e2e/data-sources.spec.ts
+        - apps/web/e2e/linkedin-import.spec.ts
+    coverage_status: good
+
+  - flow_id: linkedin_archive_process
+    flow_name: LinkedIn Archive Processing
+    category: user
+    priority: P0
+    description: Process uploaded LinkedIn archive - extract connections and messages
+    entry_points:
+      - apps/web/app/api/linkedin/archive/jobs/[jobId]/process/route.ts
+      - packages/adapters/src/linkedin/archive-parser.ts
+    happy_path_steps:
+      - POST /api/linkedin/archive/jobs/:jobId/process
+      - Job ownership verified (userId match)
+      - Job status changed to running
+      - File downloaded from Blob Storage
+      - ZIP extracted using adm-zip
+      - Connections.csv parsed - creates Person and Edge records
+      - messages.csv parsed - creates EvidenceEvent records
+      - Relationship strengths re-scored
+      - DataSourceConnection updated to CONNECTED
+      - Job marked complete
+    error_paths:
+      - Job not found (404)
+      - Job belongs to different user (404)
+      - Job not in queued state (400)
+      - Download from blob fails (500)
+      - ZIP extraction fails (500)
+      - CSV parsing fails (logged as error)
+    tests:
+      unit:
+        - apps/web/app/api/linkedin/archive/jobs/[jobId]/process/route.test.ts
+      integration:
+        - packages/adapters/src/linkedin/__tests__/archive-parser.integration.test.ts
+      e2e:
+        - apps/web/e2e/linkedin-import.spec.ts
+    coverage_status: good
+
+  - flow_id: linkedin_archive_cron_process
+    flow_name: LinkedIn Archive Cron Processing
+    category: system
+    priority: P1
+    description: Cron job polls for queued LinkedIn jobs
+    entry_points:
+      - apps/web/app/api/cron/linkedin-process/route.ts
+    happy_path_steps:
+      - GET /api/cron/linkedin-process called by Vercel cron
+      - Find oldest queued job or stuck running job >5 min
+      - Process job same as manual processing
+    error_paths:
+      - No pending jobs
+      - Processing errors
+    tests:
+      unit:
+        - apps/web/app/api/cron/linkedin-process/route.test.ts
+      integration: []
+      e2e: []
+    coverage_status: partial
+
+  - flow_id: linkedin_job_status
+    flow_name: LinkedIn Job Status Check
+    category: api
+    priority: P1
+    description: Check status and progress of LinkedIn archive processing job
+    entry_points:
+      - apps/web/app/api/linkedin/archive/jobs/[jobId]/route.ts
+    happy_path_steps:
+      - GET /api/linkedin/archive/jobs/:jobId
+      - Job fetched with userId filter
+      - Job status, progress, results returned
+    error_paths:
+      - Job not found or belongs to other user (404)
+    tests:
+      unit:
+        - apps/web/app/api/linkedin/archive/jobs/[jobId]/route.test.ts
+      integration: []
+      e2e: []
+    coverage_status: partial
+
+  - flow_id: linkedin_upload_history
+    flow_name: LinkedIn Upload History
+    category: api
+    priority: P2
+    description: View history of all LinkedIn archive uploads
+    entry_points:
+      - apps/web/app/api/linkedin/archive/history/route.ts
+    happy_path_steps:
+      - GET /api/linkedin/archive/history
+      - Fetch all IngestJobs for user
+      - Return history with aggregate statistics
+    error_paths:
+      - User not authenticated (401)
+    tests:
+      unit:
+        - apps/web/app/api/linkedin/archive/history/route.test.ts
+      integration: []
+      e2e:
+        - apps/web/e2e/linkedin-import.spec.ts
+    coverage_status: partial
+
+  - flow_id: linkedin_inngest_process
+    flow_name: LinkedIn Archive Inngest Processing
+    category: system
+    priority: P1
+    description: Process LinkedIn archive via Inngest for long-running jobs
+    entry_points:
+      - apps/web/lib/inngest-functions.ts
+      - apps/web/app/api/inngest/route.ts
+    happy_path_steps:
+      - linkedin.archive.process event received
+      - Step 1 - download file URL and userId
+      - Step 2 - download file to temp location
+      - Step 3 - run LinkedInArchiveParser
+      - Step 4 - run LinkedInRelationshipScorer
+      - Step 5 - complete job
+    error_paths:
+      - Job not found
+      - Blob URL missing
+      - Download failure
+      - Parse errors
+    tests:
+      unit:
+        - apps/web/lib/inngest-functions.test.ts
+      integration: []
+      e2e: []
+    coverage_status: partial
+
+  - flow_id: linkedin_profile_fetch
+    flow_name: LinkedIn Profile Fetch via API
+    category: api
+    priority: P3
+    description: Fetch LinkedIn profile by URL or vanity name (requires LinkedIn API)
+    entry_points:
+      - apps/web/app/api/linkedin/profile/route.ts
+    happy_path_steps:
+      - POST /api/linkedin/profile with url or vanityName
+      - Extract vanity name from URL
+      - Check if person exists in database
+      - Use LinkedIn API to fetch profile
+    error_paths:
+      - Neither url nor vanityName provided (400)
+      - LinkedIn API not configured (503)
+      - Profile not found (404)
+    tests:
+      unit:
+        - apps/web/app/api/linkedin/profile/route.test.ts
+      integration: []
+      e2e: []
+    coverage_status: minimal
+
+  # ============================================================================
+  # GMAIL INTEGRATION FLOWS
+  # ============================================================================
+
+  - flow_id: gmail_sync_cron
+    flow_name: Gmail Sync Cron Job
+    category: system
+    priority: P1
+    description: Periodically sync Gmail messages for all connected users
+    entry_points:
+      - apps/web/app/api/cron/gmail-sync/route.ts
+    happy_path_steps:
+      - POST /api/cron/gmail-sync triggered by cron
+      - Find all users with googleRefreshToken
+      - For each user, create Gmail adapter with credentials
+      - Validate connection
+      - Fetch interactions since lastGmailSyncAt
+      - Upsert Conversation and Message records
+      - Create Person records for participants
+      - Create EvidenceEvent records
+      - Create/update Edge records with gmail source
+      - Update lastGmailSyncAt timestamp
+    error_paths:
+      - Invalid token for user (logged, continue)
+      - Gmail API failure
+      - Database errors
+    tests:
+      unit:
+        - apps/web/app/api/cron/gmail-sync/route.test.ts
+      integration: []
+      e2e:
+        - apps/web/e2e/gmail-integration.spec.ts
+    coverage_status: partial
+
+  - flow_id: gmail_connection_status
+    flow_name: Gmail Connection Status Display
+    category: user
+    priority: P1
+    description: Display Gmail connection status in settings UI
+    entry_points:
+      - apps/web/app/settings/page.tsx
+      - apps/web/app/api/me/route.ts
+      - apps/web/app/api/data-sources/route.ts
+    happy_path_steps:
+      - User navigates to /settings
+      - Fetch /api/me for googleRefreshToken status
+      - Fetch /api/data-sources for connection details
+      - Display Connected or Not Connected badge
+      - Show last sync time and Sync Now button
+    error_paths:
+      - User not authenticated
+    tests:
+      unit:
+        - apps/web/app/api/me/route.test.ts
+        - apps/web/app/api/data-sources/route.test.ts
+      integration: []
+      e2e:
+        - apps/web/e2e/gmail-integration.spec.ts
+    coverage_status: good
+
+  # ============================================================================
+  # SEARCH AND PATHFINDING FLOWS
+  # ============================================================================
+
+  - flow_id: person_search
+    flow_name: Person Search
+    category: user
+    priority: P0
+    description: Search for people in network by name, email, or title
+    entry_points:
+      - apps/web/app/api/people/route.ts
+    happy_path_steps:
+      - GET /api/people?q=searchQuery
+      - Validate query parameter (min 1 char)
+      - Fetch all user people (filtered by userId)
+      - Filter by partial match on names, emails, title
+      - If no matches, use fuzzy matching (Levenshtein)
+      - Return top 10 results
+    error_paths:
+      - Missing or empty query (400)
+      - User not authenticated (401)
+    tests:
+      unit:
+        - apps/web/app/api/people/route.test.ts
+        - apps/web/app/api/people/route.multi-tenant.test.ts
+      integration: []
+      e2e:
+        - apps/web/e2e/search.spec.ts
+    coverage_status: good
+
+  - flow_id: pathfinding
+    flow_name: Find Warm Intro Paths
+    category: user
+    priority: P0
+    description: Find introduction paths from current user to target person
+    entry_points:
+      - apps/web/app/api/people/[id]/paths/route.ts
+      - packages/core/src/pathfinding.ts
+      - apps/web/lib/graph-service.ts
+    happy_path_steps:
+      - GET /api/people/:id/paths?target=targetId
+      - Validate target UUID
+      - Create GraphService with userId for isolation
+      - Run PathFinder.findPaths() - BFS with scoring
+      - Batch fetch edges and people for performance
+      - Filter edges by minStrength threshold
+      - Calculate cumulative path scores
+      - Apply path length penalty
+      - Rank paths by score, length, recency
+      - Return top N paths with explanations
+    error_paths:
+      - Invalid target UUID (400)
+      - Source person not found
+      - No paths found
+    tests:
+      unit:
+        - apps/web/app/api/people/[id]/paths/route.test.ts
+      integration: []
+      e2e:
+        - apps/web/e2e/pathfinding.spec.ts
+    coverage_status: good
+
+  - flow_id: person_detail
+    flow_name: Person Detail View
+    category: api
+    priority: P1
+    description: Fetch complete person data with evidence and connections
+    entry_points:
+      - apps/web/app/api/people/[id]/route.ts
+    happy_path_steps:
+      - GET /api/people/:id
+      - Fetch person with edges (filtered by userId)
+      - Fetch evidence events
+      - Fetch conversations
+      - Return comprehensive person data
+    error_paths:
+      - Person not found (404)
+      - Person belongs to other user (404)
+    tests:
+      unit:
+        - apps/web/app/api/people/[id]/route.test.ts
+        - apps/web/app/api/people/[id]/route.multi-tenant.test.ts
+      integration: []
+      e2e: []
+    coverage_status: good
+
+  # ============================================================================
+  # NETWORK AND CONNECTIONS FLOWS
+  # ============================================================================
+
+  - flow_id: network_overview
+    flow_name: Network Overview
+    category: api
+    priority: P1
+    description: Get all people and connections in user network graph
+    entry_points:
+      - apps/web/app/api/network/route.ts
+    happy_path_steps:
+      - GET /api/network
+      - Parallel fetch people, counts, edge stats
+      - All queries filter by userId
+      - Calculate edge strength tiers
+      - Build organization groups
+      - Return people, edges, stats
+    error_paths:
+      - User not authenticated (401)
+    tests:
+      unit:
+        - apps/web/app/api/network/route.test.ts
+        - apps/web/app/api/network/route.multi-tenant.test.ts
+      integration: []
+      e2e:
+        - apps/web/e2e/search.spec.ts
+    coverage_status: good
+
+  - flow_id: connections_list
+    flow_name: Connections List with Filtering
+    category: api
+    priority: P1
+    description: Paginated list of connections with filtering and sorting
+    entry_points:
+      - apps/web/app/api/connections/route.ts
+    happy_path_steps:
+      - GET /api/connections with pagination/filter/sort params
+      - Build Prisma where clause (includes userId filter)
+      - Apply filters and sorting
+      - Fetch connections with organization and edge counts
+      - Enrich with evidence counts
+      - Return paginated results
+    error_paths:
+      - User not authenticated (401)
+    tests:
+      unit:
+        - apps/web/app/api/connections/route.test.ts
+        - apps/web/app/api/connections/route.multi-tenant.test.ts
+      integration: []
+      e2e:
+        - apps/web/e2e/click-to-graph.spec.ts
+    coverage_status: good
+
+  - flow_id: click_to_graph
+    flow_name: Click to Find Path from Connections
+    category: user
+    priority: P1
+    description: User clicks Find Path on a connection to navigate to pathfinding
+    entry_points:
+      - apps/web/components/connections-grid.tsx
+    happy_path_steps:
+      - User views connections in grid
+      - User clicks Find Path button
+      - Application switches to Intro Finder tab
+      - Target person auto-selected
+      - Pathfinding triggered
+      - Paths displayed
+    error_paths:
+      - No paths found to target
+    tests:
+      unit: []
+      integration: []
+      e2e:
+        - apps/web/e2e/click-to-graph.spec.ts
+    coverage_status: good
+
+  # ============================================================================
+  # EVIDENCE AND DATA FLOWS
+  # ============================================================================
+
+  - flow_id: evidence_fetch
+    flow_name: Fetch Evidence for Edges
+    category: api
+    priority: P1
+    description: Get evidence events for relationship edges
+    entry_points:
+      - apps/web/app/api/evidence/route.ts
+    happy_path_steps:
+      - GET /api/evidence?edgeIds=id1,id2
+      - Parse comma-separated edge IDs
+      - Fetch edges with person names
+      - For each edge, fetch evidence filtered by userId
+      - Return evidence grouped by edge
+    error_paths:
+      - Missing edgeIds parameter (400)
+    tests:
+      unit:
+        - apps/web/app/api/evidence/route.test.ts
+      integration: []
+      e2e: []
+    coverage_status: partial
+
+  - flow_id: relationship_scoring
+    flow_name: LinkedIn Relationship Scoring
+    category: system
+    priority: P1
+    description: Calculate relationship strength based on LinkedIn evidence
+    entry_points:
+      - packages/core/src/scoring/linkedin-scorer.ts
+    happy_path_steps:
+      - scoreRelationship(fromPersonId, toPersonId) called
+      - Fetch all LinkedIn evidence for person pair
+      - Calculate factors - connectionAge, messageRecency, messageFrequency, reciprocity
+      - Apply weighted combination
+      - Determine strength tier (A/B/C/D)
+      - Return ScoringResult
+    error_paths:
+      - No evidence found (returns default D tier)
+    tests:
+      unit: []
+      integration:
+        - packages/adapters/src/linkedin/__tests__/archive-parser.integration.test.ts
+      e2e: []
+    coverage_status: partial
+
+  # ============================================================================
+  # DATA SOURCE MANAGEMENT FLOWS
+  # ============================================================================
+
+  - flow_id: data_sources_list
+    flow_name: List Data Source Connections
+    category: api
+    priority: P1
+    description: Get all data source connections for current user
+    entry_points:
+      - apps/web/app/api/data-sources/route.ts
+    happy_path_steps:
+      - GET /api/data-sources
+      - Fetch DataSourceConnection records for userId
+      - Return connections with status
+    error_paths:
+      - User not authenticated (401)
+    tests:
+      unit:
+        - apps/web/app/api/data-sources/route.test.ts
+      integration: []
+      e2e:
+        - apps/web/e2e/data-sources.spec.ts
+    coverage_status: good
+
+  - flow_id: data_source_create_update
+    flow_name: Create/Update Data Source Connection
+    category: api
+    priority: P2
+    description: Create or update data source connection configuration
+    entry_points:
+      - apps/web/app/api/data-sources/route.ts
+    happy_path_steps:
+      - POST /api/data-sources with sourceType
+      - Check if connection exists
+      - Create or update connection
+    error_paths:
+      - Missing sourceType (400)
+    tests:
+      unit:
+        - apps/web/app/api/data-sources/route.test.ts
+      integration: []
+      e2e: []
+    coverage_status: partial
+
+  - flow_id: data_source_by_id
+    flow_name: Data Source CRUD by ID
+    category: api
+    priority: P2
+    description: Get, update, or delete specific data source connection
+    entry_points:
+      - apps/web/app/api/data-sources/[id]/route.ts
+    happy_path_steps:
+      - GET/PATCH/DELETE /api/data-sources/:id
+      - Verify connection exists and belongs to user
+      - Perform requested operation
+    error_paths:
+      - Connection not found (404)
+      - Connection belongs to different user (403)
+    tests:
+      unit:
+        - apps/web/app/api/data-sources/[id]/route.test.ts
+      integration: []
+      e2e: []
+    coverage_status: partial
+
+  # ============================================================================
+  # HEALTH AND MONITORING FLOWS
+  # ============================================================================
+
+  - flow_id: health_check
+    flow_name: Basic Health Check
+    category: api
+    priority: P1
+    description: Simple liveness probe endpoint
+    entry_points:
+      - apps/web/app/api/health/route.ts
+    happy_path_steps:
+      - GET /api/health
+      - Return status=ok with timestamp
+    error_paths:
+      - Application not running
+    tests:
+      unit:
+        - apps/web/app/api/health/route.test.ts
+      integration: []
+      e2e: []
+    coverage_status: good
+
+  - flow_id: readiness_check
+    flow_name: Readiness Probe
+    category: api
+    priority: P1
+    description: Check if all dependencies are healthy
+    entry_points:
+      - apps/web/app/api/health/ready/route.ts
+    happy_path_steps:
+      - GET /api/health/ready
+      - Check database connectivity
+      - Check Inngest configuration
+      - Return status=ready if all healthy
+    error_paths:
+      - Database unreachable (503)
+    tests:
+      unit:
+        - apps/web/app/api/health/ready/route.test.ts
+      integration: []
+      e2e: []
+    coverage_status: good
+
+  # ============================================================================
+  # ADMIN AND DEBUG FLOWS
+  # ============================================================================
+
+  - flow_id: admin_linkedin_jobs
+    flow_name: Admin LinkedIn Jobs Management
+    category: api
+    priority: P2
+    description: Admin endpoint to view and manage LinkedIn processing jobs
+    entry_points:
+      - apps/web/app/api/admin/linkedin-jobs/route.ts
+    happy_path_steps:
+      - GET - List all LinkedIn jobs with status
+      - POST action=reset - Reset stuck jobs
+      - POST action=cancel - Cancel specific job
+    error_paths:
+      - Invalid action (400)
+    tests:
+      unit:
+        - apps/web/app/api/admin/linkedin-jobs/route.test.ts
+      integration: []
+      e2e: []
+    coverage_status: partial
+    notes: No authentication on admin endpoints (security concern)
+
+  - flow_id: admin_linkedin_cleanup
+    flow_name: Admin LinkedIn Jobs Cleanup
+    category: api
+    priority: P3
+    description: Clean up invalid/orphaned LinkedIn jobs
+    entry_points:
+      - apps/web/app/api/admin/linkedin-jobs/cleanup/route.ts
+    happy_path_steps:
+      - POST /api/admin/linkedin-jobs/cleanup
+      - Find all queued/running jobs
+      - Cancel jobs without blob URL
+    error_paths:
+      - Database error (500)
+    tests:
+      unit:
+        - apps/web/app/api/admin/linkedin-jobs/cleanup/route.test.ts
+      integration: []
+      e2e: []
+    coverage_status: partial
+
+  - flow_id: admin_inspect_archive
+    flow_name: Admin Archive Inspection
+    category: api
+    priority: P3
+    description: Diagnostic endpoint to inspect LinkedIn archive contents
+    entry_points:
+      - apps/web/app/api/admin/inspect-archive/route.ts
+    happy_path_steps:
+      - POST with file upload
+      - Extract ZIP to temp file
+      - List all entries
+      - Preview CSVs
+    error_paths:
+      - No file provided (400)
+      - Invalid ZIP (500)
+    tests:
+      unit:
+        - apps/web/app/api/admin/inspect-archive/route.test.ts
+      integration: []
+      e2e: []
+    coverage_status: minimal
+
+  - flow_id: debug_endpoint
+    flow_name: Debug Database State
+    category: api
+    priority: P3
+    description: Debug endpoint to check database connection and data
+    entry_points:
+      - apps/web/app/api/debug/route.ts
+    happy_path_steps:
+      - GET /api/debug
+      - Count people and edges
+      - Fetch sample data
+    error_paths:
+      - Database query failure (500)
+    tests:
+      unit:
+        - apps/web/app/api/debug/route.test.ts
+      integration: []
+      e2e: []
+    coverage_status: minimal
+
+  - flow_id: debug_linkedin
+    flow_name: Debug LinkedIn Processing State
+    category: api
+    priority: P3
+    description: Debug endpoint for LinkedIn job and evidence status
+    entry_points:
+      - apps/web/app/api/debug/linkedin/route.ts
+    happy_path_steps:
+      - GET /api/debug/linkedin
+      - Fetch recent LinkedIn jobs
+      - Count evidence events by type
+    error_paths:
+      - Database error (500)
+    tests:
+      unit:
+        - apps/web/app/api/debug/linkedin/route.test.ts
+      integration: []
+      e2e: []
+    coverage_status: minimal
+
+  # ============================================================================
+  # USER PROFILE FLOW
+  # ============================================================================
+
+  - flow_id: current_user
+    flow_name: Current User Profile
+    category: api
+    priority: P1
+    description: Get current authenticated user profile and connection status
+    entry_points:
+      - apps/web/app/api/me/route.ts
+    happy_path_steps:
+      - GET /api/me
+      - Fetch user with person record
+      - Return user identity, Gmail status (boolean), person data
+    error_paths:
+      - User not found (404)
+      - User not authenticated (401)
+    tests:
+      unit:
+        - apps/web/app/api/me/route.test.ts
+      integration: []
+      e2e: []
+    coverage_status: good
+    notes: Token exposure prevention tested (returns boolean, not actual token)
+
+  # ============================================================================
+  # SEEDING AND TESTING FLOWS
+  # ============================================================================
+
+  - flow_id: database_seed
+    flow_name: Database Seed
+    category: api
+    priority: P3
+    description: Seed database with test data (development only)
+    entry_points:
+      - apps/web/app/api/seed/route.ts
+    happy_path_steps:
+      - POST /api/seed with authorization header
+      - Verify SEED_SECRET matches
+      - Clear existing data
+      - Create seed user, organizations, people, edges
+    error_paths:
+      - Missing/invalid authorization (401)
+    tests:
+      unit:
+        - apps/web/app/api/seed/route.test.ts
+      integration: []
+      e2e: []
+    coverage_status: partial
+
+  # ============================================================================
+  # GITHUB INTEGRATION FLOWS
+  # ============================================================================
+
+  - flow_id: github_issues
+    flow_name: GitHub Issues Integration
+    category: api
+    priority: P3
+    description: Fetch and create GitHub issues for the repository
+    entry_points:
+      - apps/web/app/api/github/issues/route.ts
+    happy_path_steps:
+      - GET - Fetch issues from GitHub API
+      - Filter by state and priority labels
+      - POST - Create new issue with title, description, labels
+    error_paths:
+      - GITHUB_TOKEN not configured (500)
+      - GitHub API error
+    tests:
+      unit:
+        - apps/web/app/api/github/issues/route.test.ts
+      integration: []
+      e2e: []
+    coverage_status: partial
+
+  # ============================================================================
+  # CHANGELOG FLOW
+  # ============================================================================
+
+  - flow_id: changelog
+    flow_name: Changelog Management
+    category: api
+    priority: P3
+    description: Manage changelog entries for product roadmap
+    entry_points:
+      - apps/web/app/api/changelog/route.ts
+    happy_path_steps:
+      - GET - Fetch all changelog entries
+      - POST - Create new changelog entry
+    error_paths:
+      - Missing required fields (400)
+    tests:
+      unit:
+        - apps/web/app/api/changelog/route.test.ts
+      integration: []
+      e2e: []
+    coverage_status: partial
+
+  # ============================================================================
+  # INNGEST EVENT HANDLERS
+  # ============================================================================
+
+  - flow_id: inngest_contacts_ingested
+    flow_name: Handle Contacts Ingested Event
+    category: system
+    priority: P2
+    description: Process contacts.ingested events from adapters
+    entry_points:
+      - apps/web/lib/inngest-functions.ts
+    happy_path_steps:
+      - Event received with sourceName and count
+      - Log processing start
+      - TODO - store contacts, trigger entity resolution
+    error_paths:
+      - N/A (currently placeholder)
+    tests:
+      unit:
+        - apps/web/lib/inngest-functions.test.ts
+      integration: []
+      e2e: []
+    coverage_status: minimal
+    notes: Placeholder implementation
+
+  - flow_id: inngest_interactions_ingested
+    flow_name: Handle Interactions Ingested Event
+    category: system
+    priority: P2
+    description: Process interactions.ingested events for edge updates
+    entry_points:
+      - apps/web/lib/inngest-functions.ts
+    happy_path_steps:
+      - Event received with sourceName and count
+      - TODO - store interactions, update edge strengths
+    error_paths:
+      - N/A (currently placeholder)
+    tests:
+      unit:
+        - apps/web/lib/inngest-functions.test.ts
+      integration: []
+      e2e: []
+    coverage_status: minimal
+
+  - flow_id: inngest_entities_merged
+    flow_name: Handle Entities Merged Event
+    category: system
+    priority: P2
+    description: Handle entity resolution merge events
+    entry_points:
+      - apps/web/lib/inngest-functions.ts
+    happy_path_steps:
+      - Event received with entityType, targetId, sourceIds
+      - TODO - update edge references, create audit log
+    error_paths:
+      - N/A (currently placeholder)
+    tests:
+      unit:
+        - apps/web/lib/inngest-functions.test.ts
+      integration: []
+      e2e: []
+    coverage_status: minimal
+
+  - flow_id: inngest_graph_updated
+    flow_name: Handle Graph Updated Event
+    category: system
+    priority: P2
+    description: Invalidate caches when graph changes
+    entry_points:
+      - apps/web/lib/inngest-functions.ts
+    happy_path_steps:
+      - Event received with affectedPersonIds
+      - TODO - invalidate caches, recompute scores
+    error_paths:
+      - N/A (currently placeholder)
+    tests:
+      unit:
+        - apps/web/lib/inngest-functions.test.ts
+      integration: []
+      e2e: []
+    coverage_status: minimal
+
+  - flow_id: inngest_sync_events
+    flow_name: Handle Sync Lifecycle Events
+    category: system
+    priority: P2
+    description: Track sync operations (started, completed, failed)
+    entry_points:
+      - apps/web/lib/inngest-functions.ts
+    happy_path_steps:
+      - Events received for sync lifecycle
+      - Log sync status changes
+      - TODO - update sync state in database
+    error_paths:
+      - N/A (currently placeholder)
+    tests:
+      unit:
+        - apps/web/lib/inngest-functions.test.ts
+      integration: []
+      e2e: []
+    coverage_status: minimal
+
+  # ============================================================================
+  # PRIVACY AND MULTI-TENANT ISOLATION
+  # ============================================================================
+
+  - flow_id: privacy_multi_tenant
+    flow_name: Multi-Tenant Data Isolation
+    category: system
+    priority: P0
+    description: Ensure all data queries are filtered by authenticated userId
+    entry_points:
+      - All API routes using withAuth helper
+    happy_path_steps:
+      - Every request includes userId from session
+      - All database queries include userId in WHERE clause
+      - Person, Edge, EvidenceEvent, Conversation, Message filtered
+      - IngestJob, DataSourceConnection filtered by userId
+    error_paths:
+      - Query without userId filter (security vulnerability)
+    tests:
+      unit:
+        - apps/web/app/api/people/route.multi-tenant.test.ts
+        - apps/web/app/api/people/[id]/route.multi-tenant.test.ts
+        - apps/web/app/api/network/route.multi-tenant.test.ts
+        - apps/web/app/api/connections/route.multi-tenant.test.ts
+      integration: []
+      e2e:
+        - apps/web/e2e/privacy-controls.spec.ts
+        - apps/web/e2e/linkedin-import.spec.ts
+    coverage_status: good
+    notes: Critical security feature. All affected routes have multi-tenant tests.
+
+  - flow_id: privacy_token_exposure
+    flow_name: Token Exposure Prevention
+    category: api
+    priority: P0
+    description: Ensure OAuth tokens are never exposed in API responses
+    entry_points:
+      - apps/web/app/api/me/route.ts
+    happy_path_steps:
+      - API returns googleRefreshToken as boolean only
+      - Never returns actual token values
+    error_paths:
+      - Token leaked in response (security vulnerability)
+    tests:
+      unit:
+        - apps/web/app/api/me/route.test.ts
+      integration: []
+      e2e:
+        - apps/web/e2e/privacy-controls.spec.ts
+    coverage_status: good
+    notes: Critical security feature
+
+# ============================================================================
+# SUMMARY
+# ============================================================================
+
+summary:
+  total_flows: 45
+  by_category:
+    user: 12
+    api: 25
+    system: 8
+  by_priority:
+    P0: 8
+    P1: 16
+    P2: 12
+    P3: 9
+  coverage_status:
+    good: 20
+    partial: 20
+    minimal: 5
+  test_counts:
+    unit_test_files: 35
+    integration_test_files: 2
+    e2e_test_files: 11
+  critical_gaps:
+    - Admin endpoints lack authentication
+    - Inngest event handlers are placeholder implementations
+    - Missing E2E tests for evidence display in UI
+    - Missing integration tests for Gmail API
+    - Missing integration tests for LinkedIn API
+    - Missing unit tests for withAuth helper
+    - Missing unit tests for PathFinder class
+    - Missing unit tests for LinkedInRelationshipScorer class
+
+# ============================================================================
+# TEST FILE INVENTORY
+# ============================================================================
+
+test_files:
+  unit_tests:
+    api_routes:
+      - apps/web/app/api/admin/inspect-archive/route.test.ts
+      - apps/web/app/api/admin/linkedin-jobs/cleanup/route.test.ts
+      - apps/web/app/api/admin/linkedin-jobs/route.test.ts
+      - apps/web/app/api/changelog/route.test.ts
+      - apps/web/app/api/connections/route.test.ts
+      - apps/web/app/api/connections/route.multi-tenant.test.ts
+      - apps/web/app/api/cron/gmail-sync/route.test.ts
+      - apps/web/app/api/cron/linkedin-process/route.test.ts
+      - apps/web/app/api/data-sources/route.test.ts
+      - apps/web/app/api/data-sources/[id]/route.test.ts
+      - apps/web/app/api/debug/linkedin/route.test.ts
+      - apps/web/app/api/debug/route.test.ts
+      - apps/web/app/api/evidence/route.test.ts
+      - apps/web/app/api/github/issues/route.test.ts
+      - apps/web/app/api/health/ready/route.test.ts
+      - apps/web/app/api/health/route.test.ts
+      - apps/web/app/api/linkedin/archive/history/route.test.ts
+      - apps/web/app/api/linkedin/archive/jobs/[jobId]/process/route.test.ts
+      - apps/web/app/api/linkedin/archive/jobs/[jobId]/route.test.ts
+      - apps/web/app/api/linkedin/archive/upload/route.test.ts
+      - apps/web/app/api/linkedin/profile/route.test.ts
+      - apps/web/app/api/me/route.test.ts
+      - apps/web/app/api/network/route.test.ts
+      - apps/web/app/api/network/route.multi-tenant.test.ts
+      - apps/web/app/api/people/route.test.ts
+      - apps/web/app/api/people/route.multi-tenant.test.ts
+      - apps/web/app/api/people/[id]/paths/route.test.ts
+      - apps/web/app/api/people/[id]/route.test.ts
+      - apps/web/app/api/people/[id]/route.multi-tenant.test.ts
+      - apps/web/app/api/seed/route.test.ts
+    lib:
+      - apps/web/lib/inngest-functions.test.ts
+    adapters:
+      - packages/adapters/src/linkedin/__tests__/archive-parser.test.ts
+      - packages/adapters/src/gmail/__tests__/gmail-adapter.test.ts
+  integration_tests:
+    - packages/adapters/src/linkedin/__tests__/archive-parser.integration.test.ts
+  e2e_tests:
+    - apps/web/e2e/authentication.spec.ts
+    - apps/web/e2e/click-to-graph.spec.ts
+    - apps/web/e2e/data-sources.spec.ts
+    - apps/web/e2e/gmail-integration.spec.ts
+    - apps/web/e2e/linkedin-import.spec.ts
+    - apps/web/e2e/pathfinding.spec.ts
+    - apps/web/e2e/privacy-controls.spec.ts
+    - apps/web/e2e/search.spec.ts
+    - apps/web/e2e/search-debug.spec.ts
+
+# ============================================================================
+# KEY PACKAGES AND MODULES
+# ============================================================================
+
+packages:
+  core:
+    path: packages/core/src
+    modules:
+      - pathfinding.ts - PathFinder class for warm intro path discovery
+      - graph-service.ts - Graph operations with multi-tenant isolation
+      - entity-resolution.ts - Deduplication and entity matching
+      - scoring/linkedin-scorer.ts - LinkedIn relationship strength scoring
+      - scoring/base-scorer.ts - Base scoring interfaces
+  adapters:
+    path: packages/adapters/src
+    modules:
+      - linkedin-adapter.ts - LinkedIn API integration
+      - linkedin/archive-parser.ts - LinkedIn data export ZIP parsing
+      - gmail-adapter.ts - Gmail API integration
+      - base-adapter.ts - Base adapter interfaces
+      - factory.ts - Adapter factory
+      - mock-adapter.ts - Mock adapter for testing
+  db:
+    path: packages/db
+    description: Prisma client and database utilities
+  shared-types:
+    path: packages/shared-types
+    description: TypeScript type definitions shared across packages
