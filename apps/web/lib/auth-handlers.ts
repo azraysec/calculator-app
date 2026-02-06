@@ -29,15 +29,32 @@ export async function handleGoogleSignIn(
     };
   }
 ) {
+  console.log("[handleGoogleSignIn] Called with:", {
+    userId,
+    hasAccessToken: !!account.access_token,
+    hasRefreshToken: !!account.refresh_token,
+    expiresAt: account.expires_at,
+  });
+
   // First, get existing user data to preserve refresh token if not provided
   const existingUser = await db.user.findUnique({
     where: { id: userId },
     select: { googleRefreshToken: true },
   });
 
+  console.log("[handleGoogleSignIn] Existing user token:", {
+    hasExistingToken: !!existingUser?.googleRefreshToken,
+  });
+
   // Only update refresh token if a new one was provided
   // Google only sends refresh_token on first authorization, not subsequent logins
   const refreshTokenToStore = account.refresh_token ?? existingUser?.googleRefreshToken ?? null;
+
+  console.log("[handleGoogleSignIn] Token decision:", {
+    usingNewToken: !!account.refresh_token,
+    usingExistingToken: !account.refresh_token && !!existingUser?.googleRefreshToken,
+    finalHasToken: !!refreshTokenToStore,
+  });
 
   // Store tokens for Gmail API access
   await db.user.update({

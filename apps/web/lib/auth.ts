@@ -73,9 +73,18 @@ const fullAuthConfig = {
      * Also create/update DataSourceConnection for UI status tracking
      */
     async signIn({ user, account }: { user: any; account: any }) {
+      console.log("[Auth Event] signIn triggered", {
+        provider: account?.provider,
+        userId: user?.id,
+        hasAccessToken: !!account?.access_token,
+        hasRefreshToken: !!account?.refresh_token,
+        tokenType: account?.token_type,
+      });
+
       if (account?.provider === "google" && user?.id) {
         try {
-          await handleGoogleSignIn(user.id, account, prisma);
+          const result = await handleGoogleSignIn(user.id, account, prisma);
+          console.log("[Auth Event] handleGoogleSignIn result:", result);
         } catch (error) {
           console.error("Failed to store OAuth tokens:", error);
         }
