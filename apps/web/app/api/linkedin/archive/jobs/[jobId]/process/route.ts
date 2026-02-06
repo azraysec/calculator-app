@@ -156,7 +156,7 @@ export const POST = withAuth(async (
       where: {
         userId_sourceType: {
           userId,
-          sourceType: 'linkedin',
+          sourceType: 'LINKEDIN',
         },
       },
       update: {
@@ -173,7 +173,7 @@ export const POST = withAuth(async (
       },
       create: {
         userId,
-        sourceType: 'linkedin',
+        sourceType: 'LINKEDIN',
         connectionStatus: 'CONNECTED',
         privacyLevel: 'PRIVATE',
         lastSyncedAt: new Date(),

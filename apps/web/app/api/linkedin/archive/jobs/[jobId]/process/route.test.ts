@@ -10,7 +10,7 @@ vi.mock('@/lib/auth', () => ({
   auth: vi.fn(),
 }));
 
-// Mock Prisma
+// Mock Prisma - make upsert return empty object to avoid errors
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     ingestJob: {
@@ -18,7 +18,7 @@ vi.mock('@/lib/prisma', () => ({
       update: vi.fn(),
     },
     dataSourceConnection: {
-      upsert: vi.fn(),
+      upsert: vi.fn().mockResolvedValue({}),
     },
   },
 }));
