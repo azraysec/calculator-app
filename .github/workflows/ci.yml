@@ -102,7 +102,9 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run tests
-        run: pnpm --filter @wig/core --filter @wig/web test -- --passWithNoTests
+        run: |
+          pnpm --filter @wig/core test
+          pnpm --filter @wig/web test:unit
 
   integration-test:
     name: Run Integration Tests
