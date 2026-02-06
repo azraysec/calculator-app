@@ -442,3 +442,75 @@ The remaining 41pp gap to 90% requires testing complex infrastructure code with 
 **Reports in log: 7**
 **Oldest report:** 2026-02-01
 **Retention expires:** 2026-02-08 / 2026-02-12
+
+---
+
+## 2026-02-06
+
+### Report 1 - 03:05 (Critical Bug Fixes)
+
+**Status:** CRITICAL BUGS FIXED - Pathfinding and connector status now working
+
+**Version:** 0.15.0 → 0.16.0
+
+**Current Task:** Fixing pathfinding and connector status issues
+
+**Commits Pushed:**
+| Commit | Description |
+|--------|-------------|
+| 61f0730 | perf: optimize pathfinding with batch queries (Issue #25) |
+| dd15497 | fix: connector status not showing as connected after setup |
+| 2aff778 | fix: handle null source person in pathfinding gracefully |
+| 58fdef0 | fix: use correct DataSourceType enum value for LinkedIn |
+
+**Root Cause Analysis:**
+
+1. **Pathfinding "Failed to find introduction paths" error:**
+   - Users had `personId: null` - no Person record linked to represent themselves in graph
+   - Pathfinding requires a starting node (the user's Person) to traverse from
+   - Fixed by creating Person records and linking to User accounts
+
+2. **Connectors showing "not connected" after setup:**
+   - DataSourceConnection records were never being created
+   - LinkedIn process route and auth.ts signIn event weren't upserting connections
+   - Fixed by adding DataSourceConnection.upsert calls
+
+3. **LinkedIn sourceType enum mismatch:**
+   - Code used `'linkedin'` (lowercase) but Prisma enum is `'LINKEDIN'`
+   - Fixed enum value in LinkedIn process route
+
+**Database Fixes Applied (via script):**
+| User | Fix Applied |
+|------|-------------|
+| ariel.zamir@raysecurity.io | Linked to existing Person, created EMAIL + LINKEDIN connections |
+| zamir.ariel@gmail.com | Created new Person, linked to user, created EMAIL connection |
+
+**Database Stats After Fix:**
+- Total Persons: 9,020
+- Total Edges: 10,045
+- Total Evidence Events: 60,733
+- DataSourceConnections: 4 (2 EMAIL, 2 LINKEDIN)
+
+**Code Changes:**
+1. `packages/core/src/pathfinding.ts` - Added null check for source person
+2. `apps/web/lib/auth.ts` - Added DataSourceConnection upsert in signIn event
+3. `apps/web/app/api/linkedin/archive/jobs/[jobId]/process/route.ts` - Added DataSourceConnection upsert, fixed sourceType enum
+
+**Test Results:**
+- All 23 LinkedIn process route tests passing
+- All existing tests continue to pass
+
+**Work Plan Status:**
+| Phase | Status | Progress |
+|-------|--------|----------|
+| A | ✅ Complete | Security fixes, bug fixes |
+| B | ✅ Complete | Testing quality gate achieved |
+| C | ✅ Complete | P0 Feature Issues resolved |
+| D | 🔄 In Progress | Critical UX bugs fixed |
+
+**Blockers:** None
+
+**Next Steps:**
+1. Verify pathfinding works in deployed app
+2. Continue with remaining P2 UX improvements
+3. Monitor for any remaining issues
