@@ -64,9 +64,9 @@ describe('Connections API', () => {
         },
       ] as any);
       vi.mocked(prisma.person.count).mockResolvedValue(1);
-      vi.mocked(prisma.edge.findMany).mockResolvedValue([
-        { sources: ['linkedin'], interactionCount: 10 },
-      ] as any);
+      vi.mocked(prisma.edge.findMany)
+        .mockResolvedValueOnce([{ sources: ['linkedin'] }] as any) // availableSources query
+        .mockResolvedValueOnce([{ sources: ['linkedin'], interactionCount: 10 }] as any); // enrichment query
       vi.mocked(prisma.evidenceEvent.groupBy).mockResolvedValue([]);
 
       const request = new Request('http://localhost/api/connections?page=1&pageSize=10');
@@ -82,6 +82,7 @@ describe('Connections API', () => {
     it('should filter by userId for multi-tenant isolation', async () => {
       vi.mocked(prisma.person.findMany).mockResolvedValue([]);
       vi.mocked(prisma.person.count).mockResolvedValue(0);
+      vi.mocked(prisma.edge.findMany).mockResolvedValue([]);
 
       const request = new Request('http://localhost/api/connections');
       await GET(request);
@@ -99,6 +100,7 @@ describe('Connections API', () => {
     it('should filter by name', async () => {
       vi.mocked(prisma.person.findMany).mockResolvedValue([]);
       vi.mocked(prisma.person.count).mockResolvedValue(0);
+      vi.mocked(prisma.edge.findMany).mockResolvedValue([]);
 
       const request = new Request('http://localhost/api/connections?name=Alice');
       await GET(request);
@@ -115,6 +117,7 @@ describe('Connections API', () => {
     it('should filter by email', async () => {
       vi.mocked(prisma.person.findMany).mockResolvedValue([]);
       vi.mocked(prisma.person.count).mockResolvedValue(0);
+      vi.mocked(prisma.edge.findMany).mockResolvedValue([]);
 
       const request = new Request('http://localhost/api/connections?email=test@example.com');
       await GET(request);
@@ -131,6 +134,7 @@ describe('Connections API', () => {
     it('should filter by title', async () => {
       vi.mocked(prisma.person.findMany).mockResolvedValue([]);
       vi.mocked(prisma.person.count).mockResolvedValue(0);
+      vi.mocked(prisma.edge.findMany).mockResolvedValue([]);
 
       const request = new Request('http://localhost/api/connections?title=Engineer');
       await GET(request);
@@ -147,6 +151,7 @@ describe('Connections API', () => {
     it('should filter by company', async () => {
       vi.mocked(prisma.person.findMany).mockResolvedValue([]);
       vi.mocked(prisma.person.count).mockResolvedValue(0);
+      vi.mocked(prisma.edge.findMany).mockResolvedValue([]);
 
       const request = new Request('http://localhost/api/connections?company=Acme');
       await GET(request);
@@ -160,9 +165,75 @@ describe('Connections API', () => {
       );
     });
 
+    it('should filter by source', async () => {
+      // Mock the source filter query to find edges with linkedin source
+      vi.mocked(prisma.edge.findMany)
+        .mockResolvedValueOnce([
+          { fromPersonId: 'person-1', toPersonId: 'person-2', sources: ['linkedin'] },
+        ] as any)
+        .mockResolvedValueOnce([{ sources: ['linkedin', 'gmail'] }] as any) // availableSources query
+        .mockResolvedValueOnce([{ sources: ['linkedin'], interactionCount: 5 }] as any); // enrichment query
+      vi.mocked(prisma.person.findMany).mockResolvedValue([
+        {
+          id: 'person-1',
+          names: ['Alice'],
+          emails: [],
+          title: null,
+          organization: null,
+          _count: { outgoingEdges: 1, incomingEdges: 0 },
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          metadata: null,
+        },
+      ] as any);
+      vi.mocked(prisma.person.count).mockResolvedValue(1);
+      vi.mocked(prisma.evidenceEvent.groupBy).mockResolvedValue([]);
+
+      const request = new Request('http://localhost/api/connections?source=linkedin');
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      // Verify the first edge query was for filtering by source
+      expect(prisma.edge.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            sources: { has: 'linkedin' },
+          }),
+        })
+      );
+      // The person query should filter by the found person IDs
+      expect(prisma.person.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            id: { in: ['person-1', 'person-2'] },
+          }),
+        })
+      );
+    });
+
+    it('should return available sources in response', async () => {
+      vi.mocked(prisma.edge.findMany)
+        .mockResolvedValueOnce([
+          { sources: ['linkedin'] },
+          { sources: ['gmail', 'linkedin'] },
+        ] as any)
+        .mockResolvedValueOnce([]); // enrichment query
+      vi.mocked(prisma.person.findMany).mockResolvedValue([]);
+      vi.mocked(prisma.person.count).mockResolvedValue(0);
+
+      const request = new Request('http://localhost/api/connections');
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.availableSources).toEqual(['gmail', 'linkedin']);
+    });
+
     it('should sort by different fields', async () => {
       vi.mocked(prisma.person.findMany).mockResolvedValue([]);
       vi.mocked(prisma.person.count).mockResolvedValue(0);
+      vi.mocked(prisma.edge.findMany).mockResolvedValue([]);
 
       const sortFields = ['names', 'emails', 'title', 'createdAt', 'updatedAt', 'unknown'];
 
@@ -200,10 +271,12 @@ describe('Connections API', () => {
         },
       ] as any);
       vi.mocked(prisma.person.count).mockResolvedValue(1);
-      vi.mocked(prisma.edge.findMany).mockResolvedValue([
-        { sources: ['linkedin'], interactionCount: 5 },
-        { sources: ['gmail'], interactionCount: 10 },
-      ] as any);
+      vi.mocked(prisma.edge.findMany)
+        .mockResolvedValueOnce([{ sources: ['linkedin', 'gmail'] }] as any) // availableSources query
+        .mockResolvedValueOnce([
+          { sources: ['linkedin'], interactionCount: 5 },
+          { sources: ['gmail'], interactionCount: 10 },
+        ] as any); // enrichment query
       vi.mocked(prisma.evidenceEvent.groupBy).mockResolvedValue([
         { type: 'linkedin_message_sent', _count: 3 },
         { type: 'linkedin_message_received', _count: 5 },

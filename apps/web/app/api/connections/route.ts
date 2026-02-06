@@ -28,12 +28,36 @@ export const GET = withAuth(async (request: Request, { userId }) => {
     const emailFilter = searchParams.get('email');
     const titleFilter = searchParams.get('title');
     const companyFilter = searchParams.get('company');
+    const sourceFilter = searchParams.get('source');
+
+    // If source filter is specified, first get person IDs that have edges with that source
+    let personIdsWithSource: string[] | null = null;
+    if (sourceFilter) {
+      const edgesWithSource = await prisma.edge.findMany({
+        where: {
+          sources: { has: sourceFilter },
+          fromPerson: { userId },
+        },
+        select: {
+          fromPersonId: true,
+          toPersonId: true,
+        },
+      });
+      const personIds = new Set<string>();
+      edgesWithSource.forEach((edge) => {
+        personIds.add(edge.fromPersonId);
+        personIds.add(edge.toPersonId);
+      });
+      personIdsWithSource = Array.from(personIds);
+    }
 
     // Build where clause
     // CRITICAL: Filter by userId for multi-tenant isolation
     const where: Prisma.PersonWhereInput = {
       userId,
       deletedAt: null,
+      // Filter by source if specified
+      ...(personIdsWithSource !== null && { id: { in: personIdsWithSource } }),
     };
 
     if (nameFilter) {
@@ -86,6 +110,16 @@ export const GET = withAuth(async (request: Request, { userId }) => {
       default:
         orderBy = { names: sortOrder };
     }
+
+    // Get available sources for filter dropdown
+    const allEdges = await prisma.edge.findMany({
+      where: { fromPerson: { userId } },
+      select: { sources: true },
+      distinct: ['sources'],
+    });
+    const availableSources = Array.from(
+      new Set(allEdges.flatMap((e) => e.sources))
+    ).sort();
 
     // Fetch data
     const [connections, totalCount] = await Promise.all([
@@ -179,6 +213,7 @@ export const GET = withAuth(async (request: Request, { userId }) => {
         totalCount,
         totalPages: Math.ceil(totalCount / pageSize),
       },
+      availableSources,
     });
   } catch (error) {
     console.error('Error fetching connections:', error);

@@ -31,7 +31,15 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PersonDetailView } from '@/components/people/person-detail-view';
-import { ArrowUpDown, ChevronLeft, ChevronRight, Search, X, GitBranch, Eye } from 'lucide-react';
+import { ArrowUpDown, ChevronLeft, ChevronRight, Search, X, GitBranch, Eye, Filter, ChevronDown } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface Connection {
   id: string;
@@ -58,6 +66,7 @@ interface ConnectionsResponse {
     totalCount: number;
     totalPages: number;
   };
+  availableSources: string[];
 }
 
 interface Person {
@@ -87,6 +96,8 @@ export function ConnectionsGrid({ onFindPath }: ConnectionsGridProps) {
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [globalFilter, setGlobalFilter] = useState('');
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
+  const [sourceFilter, setSourceFilter] = useState<string>('');
+  const [availableSources, setAvailableSources] = useState<string[]>([]);
 
   // Column definitions
   const columns: ColumnDef<Connection>[] = [
@@ -327,6 +338,11 @@ export function ConnectionsGrid({ onFindPath }: ConnectionsGridProps) {
         }
       });
 
+      // Add source filter
+      if (sourceFilter) {
+        params.set('source', sourceFilter);
+      }
+
       const response = await fetch(`/api/connections?${params.toString()}`);
       if (!response.ok) {
         throw new Error('Failed to fetch connections');
@@ -335,6 +351,9 @@ export function ConnectionsGrid({ onFindPath }: ConnectionsGridProps) {
       const result: ConnectionsResponse = await response.json();
       setData(result.connections);
       setPagination(result.pagination);
+      if (result.availableSources) {
+        setAvailableSources(result.availableSources);
+      }
     } catch (error) {
       console.error('Error fetching connections:', error);
     } finally {
@@ -345,7 +364,7 @@ export function ConnectionsGrid({ onFindPath }: ConnectionsGridProps) {
   useEffect(() => {
     fetchConnections();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pagination.page, pagination.pageSize, sorting, columnFilters]);
+  }, [pagination.page, pagination.pageSize, sorting, columnFilters, sourceFilter]);
 
   return (
     <div className="space-y-4">
@@ -376,7 +395,7 @@ export function ConnectionsGrid({ onFindPath }: ConnectionsGridProps) {
       </div>
 
       {/* Column Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
         <Input
           placeholder="Filter by name..."
           value={(table.getColumn('names')?.getFilterValue() as string) ?? ''}
@@ -397,6 +416,37 @@ export function ConnectionsGrid({ onFindPath }: ConnectionsGridProps) {
           value={(table.getColumn('company')?.getFilterValue() as string) ?? ''}
           onChange={(e) => table.getColumn('company')?.setFilterValue(e.target.value)}
         />
+        {/* Source Filter Dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="w-full justify-between">
+              <span className="flex items-center gap-2">
+                <Filter className="h-4 w-4" />
+                {sourceFilter || 'All Sources'}
+              </span>
+              <ChevronDown className="h-4 w-4 opacity-50" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-[200px]">
+            <DropdownMenuLabel>Filter by Source</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => setSourceFilter('')}
+              className={!sourceFilter ? 'bg-accent' : ''}
+            >
+              All Sources
+            </DropdownMenuItem>
+            {availableSources.map((source) => (
+              <DropdownMenuItem
+                key={source}
+                onClick={() => setSourceFilter(source)}
+                className={sourceFilter === source ? 'bg-accent' : ''}
+              >
+                {source}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Data Table */}
