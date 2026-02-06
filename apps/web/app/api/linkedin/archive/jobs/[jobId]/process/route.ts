@@ -151,6 +151,44 @@ export const POST = withAuth(async (
 
     console.log(`[Process] Job ${jobId} completed successfully`);
 
+    // Update DataSourceConnection to show LinkedIn as connected
+    await prisma.dataSourceConnection.upsert({
+      where: {
+        userId_sourceType: {
+          userId,
+          sourceType: 'linkedin',
+        },
+      },
+      update: {
+        connectionStatus: 'CONNECTED',
+        lastSyncedAt: new Date(),
+        metadata: {
+          lastImport: {
+            jobId,
+            connectionsProcessed: result.connectionsProcessed,
+            messagesProcessed: result.messagesProcessed,
+            completedAt: new Date().toISOString(),
+          },
+        },
+      },
+      create: {
+        userId,
+        sourceType: 'linkedin',
+        connectionStatus: 'CONNECTED',
+        privacyLevel: 'PRIVATE',
+        lastSyncedAt: new Date(),
+        metadata: {
+          lastImport: {
+            jobId,
+            connectionsProcessed: result.connectionsProcessed,
+            messagesProcessed: result.messagesProcessed,
+            completedAt: new Date().toISOString(),
+          },
+        },
+      },
+    });
+    console.log(`[Process] DataSourceConnection updated for LinkedIn`);
+
     // Clean up temp file
     if (tempFilePath) {
       try {

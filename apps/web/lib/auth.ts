@@ -69,10 +69,12 @@ const fullAuthConfig = {
   events: {
     /**
      * Store OAuth tokens in User model for Gmail API access
+     * Also create/update DataSourceConnection for UI status tracking
      */
     async signIn({ user, account }: { user: any; account: any }) {
       if (account?.provider === "google" && user?.id) {
         try {
+          // Store tokens for Gmail API access
           await prisma.user.update({
             where: { id: user.id },
             data: {
@@ -83,6 +85,28 @@ const fullAuthConfig = {
                 : null,
             },
           });
+
+          // Create/update DataSourceConnection for Gmail status tracking
+          if (account.refresh_token) {
+            await prisma.dataSourceConnection.upsert({
+              where: {
+                userId_sourceType: {
+                  userId: user.id,
+                  sourceType: "EMAIL",
+                },
+              },
+              update: {
+                connectionStatus: "CONNECTED",
+                updatedAt: new Date(),
+              },
+              create: {
+                userId: user.id,
+                sourceType: "EMAIL",
+                connectionStatus: "CONNECTED",
+                privacyLevel: "PRIVATE",
+              },
+            });
+          }
         } catch (error) {
           console.error("Failed to store OAuth tokens:", error);
         }

@@ -17,6 +17,9 @@ vi.mock('@/lib/prisma', () => ({
       findFirst: vi.fn(),
       update: vi.fn(),
     },
+    dataSourceConnection: {
+      upsert: vi.fn(),
+    },
   },
 }));
 
