@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@wig/db";
 import { authConfig } from "./auth.config";
+import { handleGoogleSignIn } from "./auth-handlers";
 
 /**
  * NextAuth.js configuration for authentication
@@ -74,48 +75,7 @@ const fullAuthConfig = {
     async signIn({ user, account }: { user: any; account: any }) {
       if (account?.provider === "google" && user?.id) {
         try {
-          // Store tokens for Gmail API access
-          await prisma.user.update({
-            where: { id: user.id },
-            data: {
-              googleRefreshToken: account.refresh_token ?? null,
-              googleAccessToken: account.access_token ?? null,
-              tokenExpiresAt: account.expires_at
-                ? new Date(account.expires_at * 1000)
-                : null,
-            },
-          });
-
-          // Create/update DataSourceConnection for Gmail status tracking
-          // Always update when signing in with Google - we have tokens in User model
-          // Note: refresh_token may be null on subsequent logins, but we still have
-          // the previously stored token in googleRefreshToken field
-          const updatedUser = await prisma.user.findUnique({
-            where: { id: user.id },
-            select: { googleRefreshToken: true },
-          });
-
-          // Connection is CONNECTED if we have a refresh token (current or previously stored)
-          const hasRefreshToken = !!(account.refresh_token || updatedUser?.googleRefreshToken);
-
-          await prisma.dataSourceConnection.upsert({
-            where: {
-              userId_sourceType: {
-                userId: user.id,
-                sourceType: "EMAIL",
-              },
-            },
-            update: {
-              connectionStatus: hasRefreshToken ? "CONNECTED" : "DISCONNECTED",
-              updatedAt: new Date(),
-            },
-            create: {
-              userId: user.id,
-              sourceType: "EMAIL",
-              connectionStatus: hasRefreshToken ? "CONNECTED" : "DISCONNECTED",
-              privacyLevel: "PRIVATE",
-            },
-          });
+          await handleGoogleSignIn(user.id, account, prisma);
         } catch (error) {
           console.error("Failed to store OAuth tokens:", error);
         }

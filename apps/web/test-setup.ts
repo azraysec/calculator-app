@@ -7,6 +7,7 @@ import { vi } from 'vitest';
 // Mock next-auth's auth function
 vi.mock('@/lib/auth', () => ({
   auth: vi.fn(),
+  handleGoogleSignIn: vi.fn(),
 }));
 
 // Mock next/server
