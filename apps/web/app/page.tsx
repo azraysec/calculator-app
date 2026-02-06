@@ -14,7 +14,7 @@ import { GraphCanvas } from '@/components/graph/graph-canvas';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RequirementsTable } from '@/components/backlog/requirements-table';
-import { NetworkOverview } from '@/components/network/network-overview';
+import { NetworkStatsBar } from '@/components/network/network-stats-bar';
 import { VersionDisplay } from '@/components/common/version-display';
 import { UserAvatar } from '@/components/common/user-avatar';
 import { EvidenceViewer } from '@/components/evidence/evidence-viewer';
@@ -483,7 +483,6 @@ export default function IntroFinderPage() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="mb-4">
           <TabsTrigger value="finder">Intro Finder</TabsTrigger>
-          <TabsTrigger value="network">My Network</TabsTrigger>
           <TabsTrigger value="connections">Connections</TabsTrigger>
           <TabsTrigger value="sources">Data Sources</TabsTrigger>
           <TabsTrigger value="changelog">Changelog</TabsTrigger>
@@ -491,10 +490,6 @@ export default function IntroFinderPage() {
 
         <TabsContent value="finder" className="mt-0">
           {introFinderContent}
-        </TabsContent>
-
-        <TabsContent value="network" className="mt-0">
-          <NetworkOverview />
         </TabsContent>
 
         <TabsContent value="connections" className="mt-0">
@@ -505,6 +500,7 @@ export default function IntroFinderPage() {
                 Browse and filter all connections in your network
               </p>
             </div>
+            <NetworkStatsBar />
             <ConnectionsGrid onFindPath={handleFindPath} />
           </div>
         </TabsContent>
