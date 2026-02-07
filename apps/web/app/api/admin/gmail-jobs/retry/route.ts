@@ -1,15 +1,73 @@
 /**
  * Admin API to retry stuck Gmail sync jobs
  * POST /api/admin/gmail-jobs/retry - Reset stuck jobs and trigger new sync
+ * POST /api/admin/gmail-jobs/retry?userId=xxx - Trigger sync for specific user
  */
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { inngest } from '@/lib/event-bus';
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
-    // Find stuck jobs (queued or running for more than 1 hour)
+    const url = new URL(request.url);
+    const specificUserId = url.searchParams.get('userId');
+
+    // If specific user requested, just create a job for them
+    if (specificUserId) {
+      const user = await prisma.user.findUnique({
+        where: { id: specificUserId },
+        select: { googleRefreshToken: true, email: true },
+      });
+
+      if (!user?.googleRefreshToken) {
+        return NextResponse.json({ error: 'User not found or Gmail not connected' }, { status: 400 });
+      }
+
+      // Cancel any existing queued/running jobs for this user
+      await prisma.ingestJob.updateMany({
+        where: {
+          userId: specificUserId,
+          sourceName: 'gmail',
+          status: { in: ['queued', 'running'] },
+        },
+        data: {
+          status: 'cancelled',
+          completedAt: new Date(),
+          error: 'Cancelled by admin to create new job',
+        },
+      });
+
+      // Create new job
+      const job = await prisma.ingestJob.create({
+        data: {
+          userId: specificUserId,
+          sourceName: 'gmail',
+          status: 'queued',
+          progress: 0,
+          logs: 'Manual sync triggered by admin...',
+        },
+      });
+
+      // Send Inngest event
+      const eventResult = await inngest.send({
+        name: 'gmail.sync.start',
+        data: {
+          jobId: job.id,
+          userId: specificUserId,
+          fullSync: false,
+        },
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: `Created new sync job for ${user.email}`,
+        jobId: job.id,
+        inngestEventId: eventResult.ids[0],
+      });
+    }
+
+    // Otherwise, find and retry stuck jobs (queued or running for more than 1 hour)
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
 
     const stuckJobs = await prisma.ingestJob.findMany({
