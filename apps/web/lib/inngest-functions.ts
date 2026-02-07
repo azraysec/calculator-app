@@ -302,7 +302,7 @@ export const processGmailSync = inngest.createFunction(
     id: 'process-gmail-sync',
     name: 'Process Gmail Sync',
     concurrency: {
-      limit: 10, // Process max 10 users simultaneously
+      limit: 5, // Process max 5 users simultaneously (Inngest plan limit)
     },
   },
   { event: 'gmail.sync.start' },
