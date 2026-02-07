@@ -15,26 +15,40 @@ export async function POST(request: NextRequest) {
     const cursor = url.searchParams.get('cursor') || undefined;
 
     // Get user with Gmail connected
-    const users = await prisma.user.findMany({
-      where: {
-        googleRefreshToken: { not: null },
-      },
-      select: {
-        id: true,
-        email: true,
-        googleRefreshToken: true,
-        googleAccessToken: true,
-        lastGmailSyncAt: true,
-        person: { select: { id: true } },
-      },
-      take: 1,
-    });
+    const userId = url.searchParams.get('userId');
 
-    if (users.length === 0) {
-      return NextResponse.json({ error: 'No users with Gmail connected' }, { status: 400 });
+    let user;
+    if (userId) {
+      user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          email: true,
+          googleRefreshToken: true,
+          googleAccessToken: true,
+          lastGmailSyncAt: true,
+          person: { select: { id: true } },
+        },
+      });
+    } else {
+      const users = await prisma.user.findMany({
+        where: { googleRefreshToken: { not: null } },
+        select: {
+          id: true,
+          email: true,
+          googleRefreshToken: true,
+          googleAccessToken: true,
+          lastGmailSyncAt: true,
+          person: { select: { id: true } },
+        },
+        take: 1,
+      });
+      user = users[0];
     }
 
-    const user = users[0];
+    if (!user || !user.googleRefreshToken) {
+      return NextResponse.json({ error: 'User not found or Gmail not connected' }, { status: 400 });
+    }
     console.log('[Direct Sync] Starting for user:', user.email, 'cursor:', cursor);
 
     const { createGmailAdapter } = await import('@wig/adapters');
