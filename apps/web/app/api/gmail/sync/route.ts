@@ -80,14 +80,29 @@ export async function POST(request: NextRequest) {
     });
 
     // Trigger Inngest function
-    await inngest.send({
-      name: 'gmail.sync.start',
-      data: {
-        jobId: job.id,
-        userId,
-        fullSync,
-      },
-    });
+    try {
+      console.log('[Gmail Sync API] Sending event to Inngest:', { jobId: job.id, userId, fullSync });
+      const eventResult = await inngest.send({
+        name: 'gmail.sync.start',
+        data: {
+          jobId: job.id,
+          userId,
+          fullSync,
+        },
+      });
+      console.log('[Gmail Sync API] Inngest event sent:', eventResult);
+    } catch (inngestError) {
+      console.error('[Gmail Sync API] Failed to send Inngest event:', inngestError);
+      // Update job to failed state
+      await prisma.ingestJob.update({
+        where: { id: job.id },
+        data: {
+          status: 'failed',
+          error: `Failed to queue sync: ${inngestError instanceof Error ? inngestError.message : 'Unknown error'}`,
+        },
+      });
+      throw inngestError;
+    }
 
     return NextResponse.json({
       success: true,

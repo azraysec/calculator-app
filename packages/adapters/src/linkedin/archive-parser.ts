@@ -257,24 +257,36 @@ export class LinkedInArchiveParser {
           });
           result.edgesRescored += 2;
 
-          // Create evidence event
-          await this.prisma.evidenceEvent.create({
-            data: {
+          // Create evidence event (check for existing to avoid duplicates on re-upload)
+          const existingEvidence = await this.prisma.evidenceEvent.findFirst({
+            where: {
               userId: this.userId,
               subjectPersonId: mePerson.id,
               objectPersonId: person.person.id,
               type: 'linkedin_connection',
-              timestamp: connectedOn ? this.parseDate(connectedOn) : new Date(),
               source: 'linkedin_archive',
-              metadata: {
-                connectedOn,
-                company,
-                position,
-              },
             },
           });
 
-          result.evidenceEvents++;
+          if (!existingEvidence) {
+            await this.prisma.evidenceEvent.create({
+              data: {
+                userId: this.userId,
+                subjectPersonId: mePerson.id,
+                objectPersonId: person.person.id,
+                type: 'linkedin_connection',
+                timestamp: connectedOn ? this.parseDate(connectedOn) : new Date(),
+                source: 'linkedin_archive',
+                metadata: {
+                  connectedOn,
+                  company,
+                  position,
+                },
+              },
+            });
+            result.evidenceEvents++;
+          }
+
           result.count++;
         } catch (error) {
           result.errors.push(
@@ -518,27 +530,43 @@ export class LinkedInArchiveParser {
             });
             result.edgesRescored += 2;
 
-            // Create evidence event
-            await this.prisma.evidenceEvent.create({
-              data: {
+            // Create evidence event (check for existing to avoid duplicates on re-upload)
+            const messageTimestamp = date ? this.parseDate(date) : new Date();
+            const existingMessageEvidence = await this.prisma.evidenceEvent.findFirst({
+              where: {
                 userId: this.userId,
-                subjectPersonId: isSentByMe ? mePerson.id : otherPerson.id,
-                objectPersonId: isSentByMe ? otherPerson.id : mePerson.id,
-                type: isSentByMe ? 'linkedin_message_sent' : 'linkedin_message_received',
-                timestamp: date ? this.parseDate(date) : new Date(),
                 source: 'linkedin_archive',
+                type: isSentByMe ? 'linkedin_message_sent' : 'linkedin_message_received',
+                timestamp: messageTimestamp,
                 metadata: {
-                  conversationId,
-                  from: fromName,
-                  to: toName,
-                  subject: subject || null,
-                  contentLength: content?.length || 0,
-                  content: content?.substring(0, 500) || '', // Store first 500 chars
+                  path: ['conversationId'],
+                  equals: conversationId,
                 },
               },
             });
 
-            result.evidenceEvents++;
+            if (!existingMessageEvidence) {
+              await this.prisma.evidenceEvent.create({
+                data: {
+                  userId: this.userId,
+                  subjectPersonId: isSentByMe ? mePerson.id : otherPerson.id,
+                  objectPersonId: isSentByMe ? otherPerson.id : mePerson.id,
+                  type: isSentByMe ? 'linkedin_message_sent' : 'linkedin_message_received',
+                  timestamp: messageTimestamp,
+                  source: 'linkedin_archive',
+                  metadata: {
+                    conversationId,
+                    from: fromName,
+                    to: toName,
+                    subject: subject || null,
+                    contentLength: content?.length || 0,
+                    content: content?.substring(0, 500) || '', // Store first 500 chars
+                  },
+                },
+              });
+              result.evidenceEvents++;
+            }
+
             result.count++;
           }
         } catch (error) {
