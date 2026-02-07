@@ -292,6 +292,37 @@ export function GmailConnection({ onConnectionChange }: GmailConnectionProps) {
             <strong>Full Sync:</strong> Re-imports all emails (may take longer).
           </p>
         </div>
+      ) : user && !isConnected ? (
+        // User is logged in with Google but Gmail not connected - needs to revoke and reconnect
+        <div className="mt-6 space-y-4">
+          <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <h4 className="font-medium text-yellow-800 mb-2">Gmail Access Needs Reset</h4>
+            <p className="text-sm text-yellow-700 mb-3">
+              To connect Gmail, you need to re-authorize access. This is a one-time fix.
+            </p>
+            <ol className="text-sm text-yellow-700 list-decimal ml-4 space-y-1 mb-4">
+              <li>Click &quot;Open Google Permissions&quot; below</li>
+              <li>Find this app and click &quot;Remove Access&quot;</li>
+              <li>Come back here and click &quot;Connect Gmail&quot;</li>
+            </ol>
+            <div className="flex gap-3">
+              <a
+                href="https://myaccount.google.com/permissions"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors text-sm"
+              >
+                Open Google Permissions ↗
+              </a>
+              <button
+                onClick={handleConnect}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+              >
+                Connect Gmail
+              </button>
+            </div>
+          </div>
+        </div>
       ) : (
         <div className="mt-6">
           <button
