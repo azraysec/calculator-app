@@ -111,14 +111,11 @@ export function DataSourcesManager() {
           body: JSON.stringify({ fullSync }),
         });
 
-        if (response.ok) {
-          alert('Gmail sync started in background! This will process all your emails. Check back in a few minutes.');
-          await fetchConnections();
-          await refetch();
-        } else {
+        if (!response.ok) {
           const error = await response.json();
           alert(error.error || 'Failed to start sync. Please try again.');
         }
+        // No alert on success - the progress UI will show status
       }
     } catch (error) {
       console.error('Error syncing data source:', error);
@@ -218,6 +215,10 @@ export function DataSourcesManager() {
             onDisconnect={connection ? () => handleDisconnect(connection.id) : undefined}
             onReset={needsReset ? handleGmailReset : undefined}
             needsReset={needsReset}
+            onSyncComplete={async () => {
+              await fetchConnections();
+              await refetch();
+            }}
           />
         );
       })}

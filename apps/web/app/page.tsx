@@ -133,7 +133,7 @@ export default function IntroFinderPage() {
   const [activeTab, setActiveTab] = useState('finder');
 
   // Fetch current user's person record
-  const { data: currentUser } = useQuery<Person>({
+  const { data: meData } = useQuery<{ id: string; person: Person | null }>({
     queryKey: ['me'],
     queryFn: async () => {
       const res = await fetch('/api/me');
@@ -144,22 +144,25 @@ export default function IntroFinderPage() {
     },
   });
 
+  // Extract the user's Person record for pathfinding
+  const currentUserPerson = meData?.person;
+
   const {
     data: pathsResult,
     isLoading: isLoadingPaths,
     error,
   } = useQuery<PathfindingResult>({
-    queryKey: ['paths', currentUser?.id, targetPerson?.id],
+    queryKey: ['paths', currentUserPerson?.id, targetPerson?.id],
     queryFn: async () => {
       const res = await fetch(
-        `/api/people/${currentUser!.id}/paths?target=${targetPerson!.id}`
+        `/api/people/${currentUserPerson!.id}/paths?target=${targetPerson!.id}`
       );
       if (!res.ok) {
         throw new Error('Failed to find paths');
       }
       return res.json();
     },
-    enabled: !!currentUser && !!targetPerson,
+    enabled: !!currentUserPerson && !!targetPerson,
   });
 
   const isLoading = isLoadingPaths;

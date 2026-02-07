@@ -242,13 +242,20 @@ export class LinkedInArchiveParser {
             result.newPersons++;
           }
 
-          // Create edge: ME -> Person
+          // Create bidirectional edges for LinkedIn connection
+          // ME -> Person
           await this.upsertEdge(mePerson.id, person.person.id, {
             relationshipType: 'connected_to',
             sources: ['linkedin_archive'],
             firstSeenAt: connectedOn ? this.parseDate(connectedOn) : new Date(),
           });
-          result.edgesRescored++;
+          // Person -> ME (reverse edge for bidirectional graph traversal)
+          await this.upsertEdge(person.person.id, mePerson.id, {
+            relationshipType: 'connected_to',
+            sources: ['linkedin_archive'],
+            firstSeenAt: connectedOn ? this.parseDate(connectedOn) : new Date(),
+          });
+          result.edgesRescored += 2;
 
           // Create evidence event
           await this.prisma.evidenceEvent.create({
@@ -493,17 +500,23 @@ export class LinkedInArchiveParser {
               result.newPersons++;
             }
 
-            // Create or update edge between me and other person
-            await this.upsertEdge(
-              isSentByMe ? mePerson.id : otherPerson.id,
-              isSentByMe ? otherPerson.id : mePerson.id,
-              {
-                relationshipType: 'interacted_with',
-                sources: ['linkedin_archive'],
-                firstSeenAt: date ? this.parseDate(date) : new Date(),
-              }
-            );
-            result.edgesRescored++;
+            // Create bidirectional edges between me and other person
+            const fromId = isSentByMe ? mePerson.id : otherPerson.id;
+            const toId = isSentByMe ? otherPerson.id : mePerson.id;
+            const edgeDate = date ? this.parseDate(date) : new Date();
+
+            await this.upsertEdge(fromId, toId, {
+              relationshipType: 'interacted_with',
+              sources: ['linkedin_archive'],
+              firstSeenAt: edgeDate,
+            });
+            // Reverse edge for bidirectional graph traversal
+            await this.upsertEdge(toId, fromId, {
+              relationshipType: 'interacted_with',
+              sources: ['linkedin_archive'],
+              firstSeenAt: edgeDate,
+            });
+            result.edgesRescored += 2;
 
             // Create evidence event
             await this.prisma.evidenceEvent.create({
