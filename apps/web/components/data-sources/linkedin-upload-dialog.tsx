@@ -162,13 +162,24 @@ export function LinkedInUploadDialog({
       );
 
       if (!processResponse.ok) {
-        const errorData = await processResponse.json();
-        addLog('❌ Failed to start processing');
-        addLog(`Error: ${errorData.details || errorData.error || 'Unknown error'}`);
-        if (errorData.stack) {
-          console.error('Full error stack:', errorData.stack);
+        let errorMessage = 'Processing failed to start';
+        try {
+          const errorData = await processResponse.json();
+          addLog('❌ Failed to start processing');
+          addLog(`Error: ${errorData.details || errorData.error || 'Unknown error'}`);
+          if (errorData.stack) {
+            console.error('Full error stack:', errorData.stack);
+          }
+          errorMessage = errorData.details || errorData.error || errorMessage;
+        } catch {
+          // Server returned non-JSON response (e.g., Vercel error page)
+          const textError = await processResponse.text();
+          addLog('❌ Server error during processing');
+          addLog(`Status: ${processResponse.status}`);
+          console.error('Server error response:', textError);
+          errorMessage = `Server error (${processResponse.status}): Check logs for details`;
         }
-        throw new Error(errorData.details || errorData.error || 'Processing failed to start');
+        throw new Error(errorMessage);
       }
 
       addLog('✓ Processing started');
