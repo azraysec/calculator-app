@@ -98,6 +98,10 @@ export function DataSourcesManager() {
     }
   };
 
+  const handleGmailReset = () => {
+    window.open('https://myaccount.google.com/permissions', '_blank');
+  };
+
   const handleSync = async (sourceType: string) => {
     try {
       if (sourceType === 'EMAIL') {
@@ -193,6 +197,9 @@ export function DataSourcesManager() {
     <div className="space-y-4">
       {DATA_SOURCES.map((source) => {
         const connection = getConnection(source.sourceType);
+        // Gmail needs reset if there's a DISCONNECTED connection (user tried but token wasn't saved)
+        const needsReset = source.sourceType === 'EMAIL' &&
+          connection?.connectionStatus === 'DISCONNECTED';
         return (
           <DataSourceCard
             key={source.sourceType}
@@ -200,10 +207,13 @@ export function DataSourcesManager() {
             displayName={source.displayName}
             description={source.description}
             icon={source.icon}
+            sourceType={source.sourceType}
             onConnect={() => handleConnect(source.sourceType)}
-            onSync={connection ? () => handleSync(source.sourceType) : undefined}
-            onConfigure={connection ? () => handleConfigure(connection) : undefined}
+            onSync={connection?.connectionStatus === 'CONNECTED' ? () => handleSync(source.sourceType) : undefined}
+            onConfigure={connection?.connectionStatus === 'CONNECTED' ? () => handleConfigure(connection) : undefined}
             onDisconnect={connection ? () => handleDisconnect(connection.id) : undefined}
+            onReset={needsReset ? handleGmailReset : undefined}
+            needsReset={needsReset}
           />
         );
       })}

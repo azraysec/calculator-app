@@ -31,10 +31,13 @@ interface DataSourceCardProps {
   displayName: string;
   description: string;
   icon: string;
+  sourceType?: string;
   onConnect: () => void;
   onSync?: () => void;
   onConfigure?: () => void;
   onDisconnect?: () => void;
+  onReset?: () => void;
+  needsReset?: boolean;
 }
 
 export function DataSourceCard({
@@ -42,10 +45,13 @@ export function DataSourceCard({
   displayName,
   description,
   icon,
+  sourceType,
   onConnect,
   onSync,
   onConfigure,
   onDisconnect,
+  onReset,
+  needsReset,
 }: DataSourceCardProps) {
   const [loading, setLoading] = useState(false);
 
@@ -127,6 +133,32 @@ export function DataSourceCard({
           {hasError && connection?.metadata?.error && (
             <div className="text-sm text-destructive">
               Error: {connection.metadata.error}
+            </div>
+          )}
+
+          {/* Gmail Reset Instructions */}
+          {needsReset && sourceType === 'EMAIL' && (
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <h4 className="font-medium text-yellow-800 mb-2">Gmail Access Needs Reset</h4>
+              <p className="text-sm text-yellow-700 mb-3">
+                To connect Gmail, you need to re-authorize access. This is a one-time fix.
+              </p>
+              <ol className="text-sm text-yellow-700 list-decimal ml-4 space-y-1 mb-4">
+                <li>Click &quot;Open Google Permissions&quot; below</li>
+                <li>Find this app and click &quot;Remove Access&quot;</li>
+                <li>Come back here and click &quot;Connect&quot;</li>
+              </ol>
+              <div className="flex gap-3">
+                {onReset && (
+                  <Button
+                    onClick={onReset}
+                    variant="outline"
+                    className="bg-yellow-600 text-white hover:bg-yellow-700"
+                  >
+                    Open Google Permissions ↗
+                  </Button>
+                )}
+              </div>
             </div>
           )}
 
