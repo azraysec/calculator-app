@@ -102,19 +102,23 @@ export function DataSourcesManager() {
     window.open('https://myaccount.google.com/permissions', '_blank');
   };
 
-  const handleSync = async (sourceType: string) => {
+  const handleSync = async (sourceType: string, fullSync: boolean = false) => {
     try {
       if (sourceType === 'EMAIL') {
-        const response = await fetch('/api/cron/gmail-sync', {
+        const response = await fetch('/api/gmail/sync', {
           method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fullSync }),
         });
 
         if (response.ok) {
-          alert('Gmail sync started! This may take a few minutes.');
+          const data = await response.json();
+          alert(`Gmail sync started! Job ID: ${data.job?.id}. Check back in a few minutes.`);
           await fetchConnections();
           await refetch();
         } else {
-          alert('Failed to start sync. Please try again.');
+          const error = await response.json();
+          alert(error.error || 'Failed to start sync. Please try again.');
         }
       }
     } catch (error) {
