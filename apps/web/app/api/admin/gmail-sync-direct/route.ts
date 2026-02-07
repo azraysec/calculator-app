@@ -51,9 +51,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `Gmail connection invalid: ${validation.error}` }, { status: 400 });
     }
 
-    // Fetch ONE page of messages (50 to stay under timeout)
+    // Fetch ONE page of messages (10 to stay under Vercel 10s timeout)
     const result = await adapter.listInteractions({
-      limit: 50,
+      limit: 10,
       cursor,
     });
 
