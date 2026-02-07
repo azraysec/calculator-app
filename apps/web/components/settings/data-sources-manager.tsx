@@ -197,9 +197,10 @@ export function DataSourcesManager() {
     <div className="space-y-4">
       {DATA_SOURCES.map((source) => {
         const connection = getConnection(source.sourceType);
-        // Gmail needs reset if there's a DISCONNECTED connection (user tried but token wasn't saved)
+        // Gmail needs reset if there's a DISCONNECTED or ERROR status
+        // (means user tried to connect but refresh_token wasn't saved)
         const needsReset = source.sourceType === 'EMAIL' &&
-          connection?.connectionStatus === 'DISCONNECTED';
+          (connection?.connectionStatus === 'DISCONNECTED' || connection?.connectionStatus === 'ERROR');
         return (
           <DataSourceCard
             key={source.sourceType}
