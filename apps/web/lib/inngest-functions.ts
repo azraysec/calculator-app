@@ -295,7 +295,7 @@ export const processLinkedInArchive = inngest.createFunction(
 
 /**
  * Process Gmail sync in background with full pagination
- * Fetches ALL messages, not just 100
+ * Each page is processed in its own Inngest step to avoid Vercel timeouts
  */
 export const processGmailSync = inngest.createFunction(
   {
@@ -343,8 +343,8 @@ export const processGmailSync = inngest.createFunction(
       return userData;
     });
 
-    // Step 2: Get message count estimate
-    const { estimatedTotal } = await step.run('estimate-messages', async () => {
+    // Step 2: Validate connection
+    await step.run('validate-connection', async () => {
       const { createGmailAdapter } = await import('@wig/adapters');
       const adapter = createGmailAdapter({
         refreshToken: user.googleRefreshToken!,
@@ -360,47 +360,45 @@ export const processGmailSync = inngest.createFunction(
 
       await prisma.ingestJob.update({
         where: { id: jobId },
-        data: { progress: 10, logs: 'Fetching message count...' },
+        data: { progress: 10, logs: 'Connection validated, starting sync...' },
       });
-
-      // Estimate based on first page - Gmail doesn't give exact counts
-      return { estimatedTotal: 1000 }; // Will be refined as we paginate
     });
 
-    // Step 3: Paginated sync loop
-    const syncResult = await step.run('sync-all-pages', async () => {
-      const { createGmailAdapter } = await import('@wig/adapters');
-      const adapter = createGmailAdapter({
-        refreshToken: user.googleRefreshToken!,
-        accessToken: user.googleAccessToken || undefined,
-        clientId: process.env.GOOGLE_CLIENT_ID!,
-        clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      });
+    // Step 3: Paginated sync - each page is its own step
+    const maxPages = 500; // Max 50,000 messages
+    const batchSize = 100;
+    let cursor: string | undefined = undefined;
+    let totalProcessed = 0;
+    let totalContacts = 0;
+    let pageNumber = 0;
+    let hasMore = true;
 
-      let cursor: string | undefined = undefined;
-      let totalProcessed = 0;
-      let totalContacts = 0;
-      let pageNumber = 0;
-      const maxPages = 1000; // Process up to 100,000 messages (no practical limit)
-      const batchSize = 100;
+    // Determine since date
+    const sinceDate = fullSync ? undefined : (user.lastGmailSyncAt ? new Date(user.lastGmailSyncAt) : undefined);
 
-      // Determine since date
-      const sinceDate = fullSync ? undefined : (user.lastGmailSyncAt ? new Date(user.lastGmailSyncAt) : undefined);
+    while (hasMore && pageNumber < maxPages) {
+      pageNumber++;
 
-      while (pageNumber < maxPages) {
-        pageNumber++;
+      // Each page gets its own step - Inngest saves progress between steps
+      const pageResult = await step.run(`sync-page-${pageNumber}`, async () => {
+        const { createGmailAdapter } = await import('@wig/adapters');
+        const adapter = createGmailAdapter({
+          refreshToken: user.googleRefreshToken!,
+          accessToken: user.googleAccessToken || undefined,
+          clientId: process.env.GOOGLE_CLIENT_ID!,
+          clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+        });
 
-        // Fetch a page of interactions
         const result = await adapter.listInteractions({
           since: sinceDate,
           limit: batchSize,
           cursor,
         });
 
-        const interactions = result.items;
+        let pageProcessed = 0;
+        let pageContacts = 0;
 
-        // Process this batch
-        for (const interaction of interactions) {
+        for (const interaction of result.items) {
           if (!interaction.metadata?.threadId) continue;
 
           const threadId = interaction.metadata.threadId as string;
@@ -425,10 +423,6 @@ export const processGmailSync = inngest.createFunction(
             },
             update: {
               participants: interaction.participants,
-              metadata: {
-                subject: interaction.metadata.subject ?? null,
-                labels: interaction.metadata.labels ?? null,
-              } as any,
             },
           });
 
@@ -444,14 +438,10 @@ export const processGmailSync = inngest.createFunction(
               senderId: interaction.participants[0] || 'unknown',
               timestamp: interaction.timestamp,
               content: interaction.metadata.snippet as string,
-              metadata: {
-                messageId: interaction.sourceId,
-                labels: interaction.metadata.labels ?? null,
-              } as any,
+              metadata: { messageId: interaction.sourceId } as any,
             },
             update: {
               timestamp: interaction.timestamp,
-              content: interaction.metadata.snippet as string,
             },
           });
 
@@ -459,7 +449,6 @@ export const processGmailSync = inngest.createFunction(
           for (let i = 1; i < interaction.participants.length; i++) {
             const participant = interaction.participants[i];
 
-            // Find or create person for this email
             let person = await prisma.person.findFirst({
               where: { emails: { has: participant } },
             });
@@ -475,31 +464,13 @@ export const processGmailSync = inngest.createFunction(
                   metadata: { source: 'gmail' } as any,
                 },
               });
-              totalContacts++;
+              pageContacts++;
             }
-
-            // Create evidence event
-            const labels = interaction.metadata.labels;
-            const isSent = Array.isArray(labels) && labels.includes('SENT');
-
-            await prisma.evidenceEvent.create({
-              data: {
-                userId: user.id,
-                subjectPersonId: user.person?.id || person.id,
-                objectPersonId: person.id,
-                type: isSent ? 'email_sent' : 'email_received',
-                timestamp: interaction.timestamp,
-                source: 'gmail',
-                metadata: {
-                  threadId: interaction.metadata.threadId ?? null,
-                  subject: interaction.metadata.subject ?? null,
-                  messageId: interaction.sourceId,
-                } as any,
-              },
-            });
 
             // Create or update Edge
             if (user.person?.id && person.id !== user.person.id) {
+              const labels = interaction.metadata.labels;
+              const isSent = Array.isArray(labels) && labels.includes('SENT');
               const fromPersonId = isSent ? user.person.id : person.id;
               const toPersonId = isSent ? person.id : user.person.id;
 
@@ -521,22 +492,36 @@ export const processGmailSync = inngest.createFunction(
                 update: {
                   interactionCount: { increment: 1 },
                   lastSeenAt: interaction.timestamp,
-                  sources: { push: 'gmail' },
                 },
               });
             }
           }
 
-          totalProcessed++;
+          pageProcessed++;
         }
 
-        // Update progress
-        const progress = Math.min(10 + Math.floor((totalProcessed / estimatedTotal) * 85), 95);
+        return {
+          pageProcessed,
+          pageContacts,
+          hasMore: result.hasMore && !!result.nextCursor,
+          nextCursor: result.nextCursor,
+        };
+      });
+
+      // Accumulate totals
+      totalProcessed += pageResult.pageProcessed;
+      totalContacts += pageResult.pageContacts;
+      hasMore = pageResult.hasMore;
+      cursor = pageResult.nextCursor;
+
+      // Update progress after each page
+      await step.run(`update-progress-${pageNumber}`, async () => {
+        const progress = Math.min(10 + Math.floor((pageNumber / 50) * 85), 95);
         await prisma.ingestJob.update({
           where: { id: jobId },
           data: {
             progress,
-            logs: `Processing page ${pageNumber}... ${totalProcessed} messages, ${totalContacts} new contacts`,
+            logs: `Page ${pageNumber}: ${totalProcessed} messages, ${totalContacts} new contacts`,
             resultMetadata: {
               messagesProcessed: totalProcessed,
               newContacts: totalContacts,
@@ -544,21 +529,10 @@ export const processGmailSync = inngest.createFunction(
             } as any,
           },
         });
+      });
+    }
 
-        // Check if more pages
-        if (!result.hasMore || !result.nextCursor) {
-          break;
-        }
-        cursor = result.nextCursor;
-
-        // Small delay to respect rate limits
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-
-      return { totalProcessed, totalContacts, pagesProcessed: pageNumber };
-    });
-
-    // Step 4: Complete job
+    // Final step: Complete job
     await step.run('complete-job', async () => {
       await prisma.user.update({
         where: { id: userId },
@@ -571,17 +545,17 @@ export const processGmailSync = inngest.createFunction(
           status: 'completed',
           completedAt: new Date(),
           progress: 100,
-          logs: `Sync complete! ${syncResult.totalProcessed} messages, ${syncResult.totalContacts} new contacts`,
+          logs: `Sync complete! ${totalProcessed} messages, ${totalContacts} new contacts`,
           resultMetadata: {
-            messagesProcessed: syncResult.totalProcessed,
-            newContacts: syncResult.totalContacts,
-            pagesProcessed: syncResult.pagesProcessed,
+            messagesProcessed: totalProcessed,
+            newContacts: totalContacts,
+            pagesProcessed: pageNumber,
           } as any,
         },
       });
     });
 
-    return syncResult;
+    return { totalProcessed, totalContacts, pagesProcessed: pageNumber };
   }
 );
 
