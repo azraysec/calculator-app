@@ -381,7 +381,7 @@ export const processGmailSync = inngest.createFunction(
       let totalProcessed = 0;
       let totalContacts = 0;
       let pageNumber = 0;
-      const maxPages = 50; // Safety limit: 50 pages * 100 = 5000 messages max
+      const maxPages = 1000; // Process up to 100,000 messages (no practical limit)
       const batchSize = 100;
 
       // Determine since date

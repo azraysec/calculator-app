@@ -102,23 +102,22 @@ export function DataSourcesManager() {
     window.open('https://myaccount.google.com/permissions', '_blank');
   };
 
-  const handleSync = async (sourceType: string, fullSync: boolean = false) => {
+  const handleSync = async (sourceType: string, _fullSync: boolean = false) => {
     try {
       if (sourceType === 'EMAIL') {
-        const response = await fetch('/api/gmail/sync', {
+        // Use direct sync endpoint (processes 100 messages synchronously)
+        // TODO: Switch to /api/gmail/sync when Inngest is configured
+        const response = await fetch('/api/cron/gmail-sync', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fullSync }),
         });
 
         if (response.ok) {
-          const data = await response.json();
-          alert(`Gmail sync started! Job ID: ${data.job?.id}. Check back in a few minutes.`);
+          alert('Gmail sync completed! Refresh to see updated contacts.');
           await fetchConnections();
           await refetch();
         } else {
           const error = await response.json();
-          alert(error.error || 'Failed to start sync. Please try again.');
+          alert(error.error || 'Failed to sync. Please try again.');
         }
       }
     } catch (error) {
