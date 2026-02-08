@@ -28,6 +28,7 @@ describe('LinkedInArchiveParser', () => {
         update: vi.fn(),
       },
       evidenceEvent: {
+        findFirst: vi.fn().mockResolvedValue(null), // For deduplication checks
         create: vi.fn(),
       },
       conversation: {
