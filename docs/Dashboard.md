@@ -192,11 +192,12 @@ All API routes use `withAuth` wrapper which:
 
 ## Quick Links
 
+- **[Project Plan](./ProjectPlan.md)** - **SOURCE OF TRUTH for what to do next** (172 tasks for Phase 2)
+- **[PRD v1.2](./PRD-v1.2-Contact-Intelligence.md)** - Reference for Phase 3-5
 - [Test Plan](./testing/Multi-Tenant-Comprehensive-Test-Plan.md)
 - [Testing Procedure](./COMPREHENSIVE-TESTING-PROCEDURE.md)
 - [Architecture Decisions](./ArchitectureDecisions/)
 - [PRD v1.2 Adoption ADR](./ArchitectureDecisions/2026-02-14-prd-v12-adoption-strategy.md)
-- [Project Plan](./ProjectPlan.md)
 
 ---
 

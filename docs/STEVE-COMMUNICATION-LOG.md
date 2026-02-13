@@ -603,9 +603,46 @@ Updated Dashboard.md with approval status.
 - Version: v0.21.0 deployed
 - ADR-20260214: PRD v1.2 adoption strategy APPROVED WITH CONDITIONS
 
-**Next Steps:**
-1. Complete Phase 2 warm intro MVP
-2. Draft ProfileCluster schema proposal (prep for Phase 4)
-3. Begin Phase 3 planning (EventIngestionService interface)
+### T+01:00 - Work Plan Update
+**User:** "Which document has your work plan? How do you know what the next stage is?"
 
-**Lines used: ~750 / 1000**
+**Steve Response:**
+Identified `docs/ProjectPlan.md` as the work plan document, but it was outdated (still had old Phase 3/4/5).
+
+**Steve Action:**
+Completely rewrote ProjectPlan.md with:
+1. New phase structure aligned with PRD v1.2
+2. Revised Phase 2 scope (minimal for MVP)
+3. Test requirements for each phase
+4. Clear "How to Know What's Next" section
+5. Deferred tasks listed with rationale
+
+**Work Plan Location:** `docs/ProjectPlan.md` (SOURCE OF TRUTH)
+
+**How to know what's next:**
+1. Check ProjectPlan.md for current phase
+2. Find first PENDING task
+3. Check dependencies
+4. Run tests before marking DONE
+5. Update ProjectPlan.md after each task
+
+**Current Phase:** Phase 2 (Warm Intro MVP)
+**Next Task:** 2.1 - RelationshipScore schema migration
+
+**Committed:** `bbd9806` - docs: add PRD v1.2 adoption strategy ADR
+
+---
+
+**Current Status:**
+- E2E Tests: 100 passed, 2 skipped
+- Unit Tests: 421/421 passed
+- Version: v0.21.0 deployed
+- ADR-20260214: APPROVED WITH CONDITIONS
+- ProjectPlan.md: Updated with PRD-aligned phases
+
+**Next Steps:**
+1. Task 2.1: RelationshipScore schema migration
+2. Task 2.2: IntroductionPath schema migration
+3. Task 2.3: Scoring algorithm (basic)
+
+**Lines used: ~800 / 1000**
