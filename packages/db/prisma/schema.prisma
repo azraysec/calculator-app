@@ -46,6 +46,7 @@ model User {
   people             Person[]              @relation("UserPeople") // People created/imported by this user
   dataConnections    DataSourceConnection[] // User's connected data sources
   relationshipScores RelationshipScore[] // Relationship scores computed for this user
+  introductionPaths  IntroductionPath[] // Discovered intro paths for this user
 
   // NextAuth.js relationships
   accounts Account[]
@@ -178,6 +179,9 @@ model Person {
   outgoingScores RelationshipScore[] @relation("SourcePersonScores")
   incomingScores RelationshipScore[] @relation("TargetPersonScores")
 
+  // Introduction paths where this person is the target
+  targetedPaths IntroductionPath[] @relation("TargetPersonPaths")
+
   // Intro attempt relationships
   fromIntros       IntroAttempt[] @relation("FromPersonIntros")
   targetIntros     IntroAttempt[] @relation("TargetPersonIntros")
@@ -292,6 +296,42 @@ model RelationshipScore {
   @@index([sourcePersonId])
   @@index([targetPersonId])
   @@map("relationship_scores")
+}
+
+/// IntroductionPath represents a discovered path to reach a target person.
+/// Stores the path nodes, score, and status through the intro workflow.
+model IntroductionPath {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Ownership (required - every path belongs to a user)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Target person we want to reach
+  targetPersonId String
+  targetPerson   Person @relation("TargetPersonPaths", fields: [targetPersonId], references: [id], onDelete: Cascade)
+
+  // Path details (JSON array of person IDs representing the path)
+  // Structure: ["personId1", "personId2", "personId3"] where first is "me" and last is target
+  pathNodes Json
+
+  // Path metrics
+  hopCount  Int   // Number of hops (pathNodes.length - 1)
+  pathScore Float // Computed path strength (0.0-1.0)
+
+  // Human-readable explanation of the path
+  explanation String
+
+  // Workflow status
+  status PathStatus @default(SUGGESTED)
+
+  // Performance indexes
+  @@index([userId])
+  @@index([userId, targetPersonId])
+  @@index([status])
+  @@map("introduction_paths")
 }
 
 // ============================================================================
@@ -541,6 +581,14 @@ enum IntroStatus {
   responded // Introducer responded
   completed // Intro successfully made
   declined // Introducer declined
+}
+
+enum PathStatus {
+  SUGGESTED // Path discovered by algorithm
+  ACCEPTED // User accepted this path
+  IN_PROGRESS // Intro request in progress
+  COMPLETED // Intro completed successfully
+  DECLINED // User declined this path
 }
 
 enum IntroOutcome {
