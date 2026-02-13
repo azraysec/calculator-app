@@ -45,6 +45,7 @@ model User {
   messages           Message[]
   people             Person[]              @relation("UserPeople") // People created/imported by this user
   dataConnections    DataSourceConnection[] // User's connected data sources
+  relationshipScores RelationshipScore[] // Relationship scores computed for this user
 
   // NextAuth.js relationships
   accounts Account[]
@@ -173,6 +174,10 @@ model Person {
   outgoingEdges Edge[] @relation("FromPerson")
   incomingEdges Edge[] @relation("ToPerson")
 
+  // Relationship scores (this person as source or target)
+  outgoingScores RelationshipScore[] @relation("SourcePersonScores")
+  incomingScores RelationshipScore[] @relation("TargetPersonScores")
+
   // Intro attempt relationships
   fromIntros       IntroAttempt[] @relation("FromPersonIntros")
   targetIntros     IntroAttempt[] @relation("TargetPersonIntros")
@@ -240,6 +245,53 @@ model Interaction {
   @@index([participants]) // Find interactions by participant
   @@index([sourceName, sourceId]) // Prevent duplicates from same source
   @@map("interactions")
+}
+
+// ============================================================================
+// RELATIONSHIP SCORING
+// ============================================================================
+
+/// RelationshipScore captures computed relationship strength between two people.
+/// Used by the pathfinding algorithm to find warm intro paths.
+/// All scores are normalized to 0.0-1.0 range.
+model RelationshipScore {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Ownership (required - every score belongs to a user)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Relationship endpoints
+  sourcePersonId String
+  targetPersonId String
+  sourcePerson   Person @relation("SourcePersonScores", fields: [sourcePersonId], references: [id], onDelete: Cascade)
+  targetPerson   Person @relation("TargetPersonScores", fields: [targetPersonId], references: [id], onDelete: Cascade)
+
+  // Individual scoring factors (0.0-1.0)
+  recencyScore       Float @default(0.0) // Higher = more recent interaction
+  frequencyScore     Float @default(0.0) // Higher = more frequent interaction
+  bidirectionalScore Float @default(0.0) // Higher = more balanced communication
+  channelDiversity   Float @default(0.0) // Higher = more channels used
+
+  // Composite scores (0.0-1.0)
+  overallScore Float @default(0.0) // Weighted combination of all factors
+  confidence   Float @default(0.0) // Confidence in the score (based on data completeness)
+
+  // Interaction metadata
+  interactionCount  Int       @default(0) // Total interactions counted
+  lastInteractionAt DateTime? // Most recent interaction timestamp
+
+  // Unique constraint: one score per user+source+target combination
+  @@unique([userId, sourcePersonId, targetPersonId])
+
+  // Performance indexes
+  @@index([userId])
+  @@index([userId, overallScore])
+  @@index([sourcePersonId])
+  @@index([targetPersonId])
+  @@map("relationship_scores")
 }
 
 // ============================================================================
