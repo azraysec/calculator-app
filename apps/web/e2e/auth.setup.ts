@@ -3,7 +3,7 @@
  *
  * Creates an authenticated session for E2E tests by:
  * 1. Creating a test user in the database
- * 2. Creating a valid session for that user
+ * 2. Generating a valid JWT token (matching NextAuth JWT strategy)
  * 3. Setting the session cookie
  *
  * This setup runs once before all tests and stores the authenticated state.
@@ -11,9 +11,25 @@
 
 import { test as setup } from '@playwright/test';
 import { prisma } from '@wig/db';
-import crypto from 'crypto';
+import { encode } from '@auth/core/jwt';
 
 const authFile = 'playwright/.auth/user.json';
+
+// Must match the AUTH_SECRET from playwright.config.ts
+const AUTH_SECRET = process.env.AUTH_SECRET || 'test-secret-for-local-development-only-do-not-use-in-production-a1b2c3d4e5f6';
+
+/**
+ * Encode a JWT token using NextAuth's own encode function
+ * This ensures the token format matches exactly
+ */
+async function encodeJwt(payload: any): Promise<string> {
+  const token = await encode({
+    token: payload,
+    secret: AUTH_SECRET,
+    salt: 'authjs.session-token', // NextAuth uses the cookie name as salt
+  });
+  return token;
+}
 
 setup('authenticate', async ({ context }) => {
   // Create a test user with a valid session
@@ -55,19 +71,21 @@ setup('authenticate', async ({ context }) => {
       },
     });
 
-    // Create a session token
-    const sessionToken = crypto.randomUUID();
+    // Generate JWT token (NextAuth JWT strategy)
     const expires = new Date();
     expires.setMonth(expires.getMonth() + 1); // 1 month from now
 
-    // Create session in database
-    await prisma.session.create({
-      data: {
-        sessionToken,
-        userId: user.id,
-        expires,
-      },
-    });
+    // Create JWT payload matching NextAuth format
+    const jwtPayload = {
+      id: user.id,
+      name: testUserName,
+      email: testUserEmail,
+      picture: null,
+      sub: user.id, // NextAuth uses sub for user ID
+    };
+
+    const sessionToken = await encodeJwt(jwtPayload);
+    console.log(`Generated JWT token for user: ${user.id}`);
 
     console.log(`Created session token: ${sessionToken}`);
 
