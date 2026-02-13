@@ -53,6 +53,7 @@
     "zustand": "^5.0.10"
   },
   "devDependencies": {
+    "@auth/core": "^0.34.3",
     "@playwright/test": "^1.58.0",
     "@types/adm-zip": "^0.5.7",
     "@types/node": "^22.10.5",
