@@ -1,5 +1,7 @@
 /**
  * ActionPanel Tests
+ *
+ * @vitest-environment jsdom
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -16,13 +18,14 @@ vi.mock('@/hooks/use-toast', () => ({
   }),
 }));
 
-// Mock clipboard API
+// Mock clipboard API (navigator exists in jsdom)
 const mockWriteText = vi.fn();
 Object.defineProperty(navigator, 'clipboard', {
   value: {
     writeText: mockWriteText,
   },
   writable: true,
+  configurable: true,
 });
 
 describe('ActionPanel', () => {
