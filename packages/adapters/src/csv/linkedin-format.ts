@@ -16,16 +16,6 @@ export interface LinkedInConnection {
   connectedOn: Date | null;
 }
 
-/** Column name mapping from LinkedIn CSV to interface fields */
-const COLUMN_MAP: Record<string, keyof LinkedInConnection> = {
-  'First Name': 'firstName',
-  'Last Name': 'lastName',
-  'Email Address': 'email',
-  'Company': 'company',
-  'Position': 'position',
-  'Connected On': 'connectedOn',
-};
-
 /**
  * Parse LinkedIn connection CSV rows into structured data.
  *

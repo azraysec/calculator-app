@@ -65,7 +65,7 @@ export interface NetworkGraphProps {
 
 export function NetworkGraph({
   path,
-  paths,
+  paths: _paths, // Reserved for future multi-path display
   pathResults,
   onPathSelect,
 }: NetworkGraphProps) {

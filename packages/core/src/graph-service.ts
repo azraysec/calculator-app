@@ -18,7 +18,7 @@ import type {
 } from '@wig/shared-types';
 
 import { PathFinder, calculatePathRankingFactors } from './pathfinding';
-import { calculateStrength, DEFAULT_WEIGHTS } from './scoring';
+import { calculateStrength, LEGACY_DEFAULT_WEIGHTS } from './scoring';
 import { findMatches } from './entity-resolution';
 
 export interface GraphServiceDeps {
@@ -87,7 +87,7 @@ export class GraphServiceImpl implements GraphService {
       return 0;
     }
 
-    return calculateStrength(edge.strengthFactors, weights || DEFAULT_WEIGHTS);
+    return calculateStrength(edge.strengthFactors, weights || LEGACY_DEFAULT_WEIGHTS);
   }
 
   async explainPath(path: Path): Promise<PathExplanation> {

@@ -143,9 +143,9 @@ export function applyEdgeHighlight(
  * PathHighlight component - renders nothing but provides context
  * Use the utility functions for applying styles
  */
-export function PathHighlight({ pathNodeIds }: PathHighlightProps): null {
-  // This component doesn't render anything
-  // It's used for organizational purposes and to export types
+export function PathHighlight({ pathNodeIds: _pathNodeIds }: PathHighlightProps): null {
+  // This component doesn't render anything - it's a stub for type exports
+  // Use the utility functions (applyNodeHighlight, applyEdgeHighlight) directly
   return null;
 }
 

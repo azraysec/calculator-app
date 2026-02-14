@@ -72,7 +72,7 @@ Thanks so much for considering this!
 Best regards`;
 }
 
-export function ActionPanel({ path, onRequestIntro }: ActionPanelProps) {
+export function ActionPanel({ path, onRequestIntro: _onRequestIntro }: ActionPanelProps) {
   const { toast } = useToast();
   const [draft, setDraft] = useState<string>('');
   const [showDraft, setShowDraft] = useState(false);

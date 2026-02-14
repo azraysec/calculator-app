@@ -244,7 +244,7 @@ export class CSVAdapter {
         data: {
           fromPersonId,
           toPersonId,
-          relationshipType: 'PROFESSIONAL',
+          relationshipType: 'connected_to',
           strength: 0.5, // Default strength
           sources: ['linkedin'],
           channels: ['linkedin'],

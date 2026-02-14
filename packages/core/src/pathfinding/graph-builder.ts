@@ -6,7 +6,7 @@
  */
 
 import type { PrismaClient } from '@prisma/client';
-import type { Graph, Node, Edge, Adjacency } from './types';
+import type { Graph, Node, Adjacency } from './types';
 
 /**
  * Build a graph from the database for a specific user.
