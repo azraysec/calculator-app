@@ -173,9 +173,11 @@ ${messages.join('\n')}`;
       await parser2.parseArchive(archivePath2);
 
       // Each user should have their own Person record for Bob
+      // Filter by test user IDs to avoid interference from leftover data
       const allBobs = await prisma.person.findMany({
         where: {
           emails: { has: 'bob@example.com' },
+          userId: { in: [testUserId1, testUserId2] },
         },
       });
 
