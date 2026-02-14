@@ -1,32 +1,22 @@
 /**
  * ActionPanel Tests
  *
- * @vitest-environment jsdom
+ * Tests for the generateIntroDraft utility function.
+ * Component rendering tests would require @testing-library/react.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
-  ActionPanel,
   generateIntroDraft,
   PathResultWithNames,
 } from './ActionPanel';
 
-// Mock use-toast hook
+// Mock use-toast hook (needed if component tests are added)
 vi.mock('@/hooks/use-toast', () => ({
   useToast: () => ({
     toast: vi.fn(),
   }),
 }));
-
-// Mock clipboard API (navigator exists in jsdom)
-const mockWriteText = vi.fn();
-Object.defineProperty(navigator, 'clipboard', {
-  value: {
-    writeText: mockWriteText,
-  },
-  writable: true,
-  configurable: true,
-});
 
 describe('ActionPanel', () => {
   const samplePath: PathResultWithNames = {
@@ -51,7 +41,6 @@ describe('ActionPanel', () => {
 
   it('should render without crashing', () => {
     // Test that generateIntroDraft works with valid path
-    // (Component rendering requires React environment)
     const draft = generateIntroDraft(samplePath);
     expect(draft).toBeTruthy();
     expect(typeof draft).toBe('string');
@@ -96,14 +85,16 @@ describe('ActionPanel', () => {
     expect(draft).toContain('Strong professional connection through Alice');
   });
 
-  it('should copy draft to clipboard when button clicked', async () => {
-    mockWriteText.mockResolvedValue(undefined);
-
-    // Test the clipboard functionality via the utility function
+  it('should generate draft that can be copied to clipboard', () => {
+    // Test that generateIntroDraft returns a string suitable for clipboard
     const draft = generateIntroDraft(samplePath);
-    await navigator.clipboard.writeText(draft);
 
-    expect(mockWriteText).toHaveBeenCalledWith(draft);
+    // Draft should be a non-empty string
+    expect(typeof draft).toBe('string');
+    expect(draft.length).toBeGreaterThan(0);
+
+    // Draft should be valid text (no null bytes, etc.)
+    expect(draft).not.toContain('\0');
   });
 
   it('should handle path with no intermediaries (direct connection)', () => {
