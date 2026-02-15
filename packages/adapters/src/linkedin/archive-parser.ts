@@ -179,34 +179,8 @@ export class LinkedInArchiveParser {
         console.log('[Parser] First connection record sample:', JSON.stringify(records[0]).substring(0, 200));
       }
 
-      // Get or create "me" person for this user
-      let mePerson = await this.prisma.person.findFirst({
-        where: {
-          userId: this.userId,
-          metadata: {
-            path: ['isMe'],
-            equals: true,
-          },
-          deletedAt: null,
-        },
-      });
-
-      if (!mePerson) {
-        // Create the user's Person record if it doesn't exist
-        const userName = this.userEmail?.split('@')[0] || 'Me';
-        mePerson = await this.prisma.person.create({
-          data: {
-            userId: this.userId,
-            names: [userName],
-            emails: this.userEmail ? [this.userEmail] : [],
-            metadata: {
-              isMe: true,
-              source: 'linkedin_archive',
-              createdAt: new Date().toISOString(),
-            },
-          },
-        });
-      }
+      // Get or create "me" person for this user (also links to User if needed)
+      const mePerson = await this.getOrCreateMePerson();
 
       // Process each connection
       for (const record of records) {
@@ -374,34 +348,8 @@ export class LinkedInArchiveParser {
 
       console.log(`[Parser] Column validation: FROM=${hasFrom}, TO=${hasTo}, CONTENT=${hasContent}, DATE=${hasDate}, CONVERSATION_ID=${hasConversationId}`);
 
-      // Get or create "me" person for this user
-      let mePerson = await this.prisma.person.findFirst({
-        where: {
-          userId: this.userId,
-          metadata: {
-            path: ['isMe'],
-            equals: true,
-          },
-          deletedAt: null,
-        },
-      });
-
-      if (!mePerson) {
-        // Create the user's Person record if it doesn't exist
-        const userName = this.userEmail?.split('@')[0] || 'Me';
-        mePerson = await this.prisma.person.create({
-          data: {
-            userId: this.userId,
-            names: [userName],
-            emails: this.userEmail ? [this.userEmail] : [],
-            metadata: {
-              isMe: true,
-              source: 'linkedin_archive',
-              createdAt: new Date().toISOString(),
-            },
-          },
-        });
-      }
+      // Get or create "me" person for this user (also links to User if needed)
+      const mePerson = await this.getOrCreateMePerson();
 
       // Group messages by conversation
       const conversationMap = new Map<string, any[]>();
@@ -593,6 +541,67 @@ export class LinkedInArchiveParser {
     }
 
     return result;
+  }
+
+  /**
+   * Get or create the "me" person for this user
+   * CRITICAL: Ensures the mePerson is linked to the User record for pathfinding consistency
+   */
+  private async getOrCreateMePerson(): Promise<{ id: string; names: string[] }> {
+    // First check if user already has a linked personId to ensure consistency
+    const user = await this.prisma.user.findUnique({
+      where: { id: this.userId },
+      select: { personId: true, email: true, name: true },
+    });
+
+    let mePerson = user?.personId
+      ? await this.prisma.person.findUnique({
+          where: { id: user.personId },
+        })
+      : null;
+
+    // If no linked person, look for existing "me" person by metadata
+    if (!mePerson) {
+      mePerson = await this.prisma.person.findFirst({
+        where: {
+          userId: this.userId,
+          metadata: {
+            path: ['isMe'],
+            equals: true,
+          },
+          deletedAt: null,
+        },
+      });
+    }
+
+    // Create new "me" person if not found
+    if (!mePerson) {
+      const userName = this.userEmail?.split('@')[0] || user?.name || 'Me';
+      mePerson = await this.prisma.person.create({
+        data: {
+          userId: this.userId,
+          names: [userName],
+          emails: this.userEmail ? [this.userEmail] : [],
+          metadata: {
+            isMe: true,
+            source: 'linkedin_archive',
+            createdAt: new Date().toISOString(),
+          },
+        },
+      });
+    }
+
+    // CRITICAL: Link the mePerson to the User if not already linked
+    // This ensures /api/me returns the correct person for pathfinding
+    if (!user?.personId) {
+      await this.prisma.user.update({
+        where: { id: this.userId },
+        data: { personId: mePerson.id },
+      });
+      console.log(`[Parser] Linked mePerson ${mePerson.id} to user ${this.userId}`);
+    }
+
+    return mePerson;
   }
 
   /**

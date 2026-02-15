@@ -17,8 +17,13 @@ describe('LinkedInArchiveParser', () => {
 
   beforeEach(() => {
     mockPrisma = {
+      user: {
+        findUnique: vi.fn().mockResolvedValue({ personId: null, email: 'test@example.com', name: 'Test User' }),
+        update: vi.fn().mockResolvedValue({}),
+      },
       person: {
         findFirst: vi.fn(),
+        findUnique: vi.fn().mockResolvedValue(null),
         create: vi.fn(),
         update: vi.fn(),
       },
@@ -37,7 +42,7 @@ describe('LinkedInArchiveParser', () => {
       },
     };
 
-    parser = new LinkedInArchiveParser(mockPrisma as any, 'test@example.com');
+    parser = new LinkedInArchiveParser(mockPrisma as any, 'test-user-id');
   });
 
   describe('findFile', () => {
