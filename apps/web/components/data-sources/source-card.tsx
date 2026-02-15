@@ -140,10 +140,12 @@ export function SourceCard({ source, onConnect, onSync, onClick }: SourceCardPro
         </div>
       )}
 
-      {/* Last Sync */}
-      {isConnected && (
-        <div className="text-xs text-muted-foreground mb-3">
-          Last sync: {formatLastSync(source.lastSync)}
+      {/* Last Sync - Show even when not connected if there was a previous sync */}
+      {source.lastSync && (
+        <div className={`text-xs mb-3 ${isConnected ? 'text-muted-foreground' : 'text-amber-600'}`}>
+          {isConnected
+            ? `Last sync: ${formatLastSync(source.lastSync)}`
+            : `Previously connected (${formatLastSync(source.lastSync)})`}
         </div>
       )}
 

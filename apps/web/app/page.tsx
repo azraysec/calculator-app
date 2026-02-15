@@ -132,8 +132,13 @@ export default function IntroFinderPage() {
   const [linkedInDialogOpen, setLinkedInDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('finder');
 
-  // Fetch current user's person record
-  const { data: meData } = useQuery<{ id: string; person: Person | null }>({
+  // Fetch current user's person record and connection status
+  const { data: meData } = useQuery<{
+    id: string;
+    person: Person | null;
+    googleRefreshToken: boolean;
+    lastGmailSyncAt: string | null;
+  }>({
     queryKey: ['me'],
     queryFn: async () => {
       const res = await fetch('/api/me');
@@ -143,6 +148,48 @@ export default function IntroFinderPage() {
       return res.json();
     },
   });
+
+  // Fetch LinkedIn upload history to determine connection status
+  const { data: linkedInHistory } = useQuery<{
+    history: Array<{ id: string; status: string; uploadedAt: string }>;
+    aggregate: { totalUploads: number; successful: number };
+  }>({
+    queryKey: ['linkedinHistory'],
+    queryFn: async () => {
+      const res = await fetch('/api/linkedin/archive/history');
+      if (!res.ok) return { history: [], aggregate: { totalUploads: 0, successful: 0 } };
+      return res.json();
+    },
+  });
+
+  // Update source statuses based on meData and linkedInHistory
+  useEffect(() => {
+    setSources(prev => prev.map(source => {
+      if (source.id === 'gmail') {
+        const isConnected = meData?.googleRefreshToken === true;
+        const lastSync = meData?.lastGmailSyncAt ? new Date(meData.lastGmailSyncAt) : undefined;
+        return {
+          ...source,
+          status: isConnected ? 'connected' as const : 'not_connected' as const,
+          lastSync,
+        };
+      }
+      if (source.id === 'linkedin') {
+        // Only update if not currently syncing (preserve syncing state)
+        if (source.status === 'syncing') return source;
+
+        const hasHistory = (linkedInHistory?.aggregate?.successful ?? 0) > 0;
+        const lastUpload = linkedInHistory?.history?.[0];
+        const lastSync = lastUpload?.uploadedAt ? new Date(lastUpload.uploadedAt) : undefined;
+        return {
+          ...source,
+          status: hasHistory ? 'connected' as const : 'not_connected' as const,
+          lastSync,
+        };
+      }
+      return source;
+    }));
+  }, [meData?.googleRefreshToken, meData?.lastGmailSyncAt, linkedInHistory]);
 
   // Extract the user's Person record for pathfinding
   const currentUserPerson = meData?.person;
