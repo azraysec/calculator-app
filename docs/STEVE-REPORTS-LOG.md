@@ -517,6 +517,74 @@ The remaining 41pp gap to 90% requires testing complex infrastructure code with 
 
 ---
 
+## 2026-02-16
+
+### Report 1 - 10:30 (Session Summary - v0.26.0 Release)
+
+**Status:** COMPLETE - All P0/P1 issues fixed and deployed
+
+**Version:** 0.25.0 → 0.26.0
+
+**Current Task:** Fix critical evidence display and connection status issues
+
+**Commits Pushed:**
+| Commit | Description |
+|--------|-------------|
+| 9670898 | fix: link mePerson to User during LinkedIn import for evidence consistency |
+| 4b55861 | feat: improve data source connection status visibility |
+| 8f7bf37 | feat: add version to health endpoint for deployment verification |
+| d617ef0 | chore: bump version to 0.26.0 and add tests for mePerson linking |
+
+**Issues Fixed:**
+
+1. **Issue #35 (P0-Critical) - Evidence not displaying for paths**
+   - Root Cause: LinkedIn archive parser created "me" person but never linked it to User.personId
+   - Fix: Added `getOrCreateMePerson()` helper in `packages/adapters/src/linkedin/archive-parser.ts`
+
+2. **Issue #36 (P1-High) - LinkedIn connection status unclear**
+   - Fix: Added LinkedIn history query to show connection status and last upload time
+
+3. **Issue #37 (P1-High) - Gmail connection status unclear**
+   - Fix: Updated meData interface to include googleRefreshToken and lastGmailSyncAt
+   - Shows "Previously connected" with timestamp when token expired
+
+**Files Modified:**
+- `packages/adapters/src/linkedin/archive-parser.ts` - Added getOrCreateMePerson helper
+- `packages/adapters/src/linkedin/__tests__/archive-parser.test.ts` - Added 3 new tests
+- `apps/web/app/page.tsx` - Added Gmail/LinkedIn status tracking
+- `apps/web/components/data-sources/source-card.tsx` - Show "Previously connected" state
+- `apps/web/package.json` - Version 0.26.0
+
+**Test Results:**
+| Suite | Passed | Skipped | Failed |
+|-------|--------|---------|--------|
+| Adapters (Vitest) | 85 | 0 | 0 |
+| Web (Vitest) | 456 | 0 | 0 |
+| E2E (Playwright) | 100 | 2 | 0 |
+
+**Deployment:**
+- ✅ CI Pipeline: Passed
+- ✅ Vercel Production: Deployed
+- ✅ Health Check: Confirmed v0.26.0 live
+
+**Remaining Open Issues (All P2-Medium):**
+- #34: Pagination state not preserved
+- #33: Endless scroll and page size selection
+- #24: Show more data on feedback
+- #22: In changelog, show upcoming feedbacks
+- #21: Keyboard shortcuts for feedback form
+- #19: Add test coverage status to changelog
+- #16: Add unit tests for all UI components
+- #15: Add E2E tests for all user flows
+- #7: Allow user to see all data points for a user
+- #3: Assess connection strength by message content
+
+**Blockers:** None
+
+**PROTOCOL NOTE:** This report added retroactively on 2026-02-16 to correct missing session documentation.
+
+---
+
 ## 2026-02-13
 
 ### Report 1 - 23:00 (E2E Test Fixes - Session Summary)
