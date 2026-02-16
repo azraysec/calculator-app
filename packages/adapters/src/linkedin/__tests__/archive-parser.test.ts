@@ -310,6 +310,79 @@ describe('LinkedInArchiveParser', () => {
     });
   });
 
+  describe('getOrCreateMePerson', () => {
+    it('should use existing linked person from User.personId', async () => {
+      const linkedPerson = {
+        id: 'linked-person-id',
+        names: ['Linked User'],
+        emails: ['linked@example.com'],
+      };
+
+      mockPrisma.user.findUnique.mockResolvedValue({
+        personId: 'linked-person-id',
+        email: 'test@example.com',
+        name: 'Test User',
+      });
+      mockPrisma.person.findUnique.mockResolvedValue(linkedPerson);
+
+      const result = await (parser as any).getOrCreateMePerson();
+
+      expect(result.id).toBe('linked-person-id');
+      expect(mockPrisma.person.findFirst).not.toHaveBeenCalled();
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it('should find existing me person by metadata when not linked', async () => {
+      const mePerson = {
+        id: 'me-person-id',
+        names: ['Me Person'],
+        emails: ['me@example.com'],
+      };
+
+      mockPrisma.user.findUnique.mockResolvedValue({
+        personId: null,
+        email: 'test@example.com',
+        name: 'Test User',
+      });
+      mockPrisma.person.findUnique.mockResolvedValue(null);
+      mockPrisma.person.findFirst.mockResolvedValue(mePerson);
+
+      const result = await (parser as any).getOrCreateMePerson();
+
+      expect(result.id).toBe('me-person-id');
+      expect(mockPrisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'test-user-id' },
+        data: { personId: 'me-person-id' },
+      });
+    });
+
+    it('should create new me person and link to user when none exists', async () => {
+      const newPerson = {
+        id: 'new-me-id',
+        names: ['Test'],
+        emails: ['test@example.com'],
+      };
+
+      mockPrisma.user.findUnique.mockResolvedValue({
+        personId: null,
+        email: 'test@example.com',
+        name: 'Test User',
+      });
+      mockPrisma.person.findUnique.mockResolvedValue(null);
+      mockPrisma.person.findFirst.mockResolvedValue(null);
+      mockPrisma.person.create.mockResolvedValue(newPerson);
+
+      const result = await (parser as any).getOrCreateMePerson();
+
+      expect(result.id).toBe('new-me-id');
+      expect(mockPrisma.person.create).toHaveBeenCalled();
+      expect(mockPrisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'test-user-id' },
+        data: { personId: 'new-me-id' },
+      });
+    });
+  });
+
   describe('parseConnections', () => {
     beforeEach(() => {
       // Setup mock for "me" person
