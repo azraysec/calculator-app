@@ -5,13 +5,13 @@
  * Full-featured data grid for browsing connections with filtering and sorting
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import {
   useReactTable,
   getCoreRowModel,
   getFilteredRowModel,
   getSortedRowModel,
-  getPaginationRowModel,
   ColumnDef,
   flexRender,
   SortingState,
@@ -29,9 +29,10 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PersonDetailView } from '@/components/people/person-detail-view';
-import { ArrowUpDown, ChevronLeft, ChevronRight, Search, X, GitBranch, Eye, Filter, ChevronDown } from 'lucide-react';
+import { ArrowUpDown, Search, X, GitBranch, Eye, Filter, ChevronDown, Loader2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -83,21 +84,83 @@ interface ConnectionsGridProps {
   onFindPath?: (person: Person) => void;
 }
 
+const PAGE_SIZE_OPTIONS = [25, 50, 100, 200] as const;
+
 export function ConnectionsGrid({ onFindPath }: ConnectionsGridProps) {
-  const [data, setData] = useState<Connection[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [pagination, setPagination] = useState({
-    page: 1,
-    pageSize: 50,
-    totalCount: 0,
-    totalPages: 0,
-  });
+  const [pageSize, setPageSize] = useState(50);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [globalFilter, setGlobalFilter] = useState('');
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
   const [sourceFilter, setSourceFilter] = useState<string>('');
-  const [availableSources, setAvailableSources] = useState<string[]>([]);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  const fetchConnectionsPage = async ({ pageParam = 1 }: { pageParam?: number }): Promise<ConnectionsResponse> => {
+    const params = new URLSearchParams({
+      page: pageParam.toString(),
+      pageSize: pageSize.toString(),
+    });
+
+    if (sorting.length > 0) {
+      params.set('sortBy', sorting[0].id);
+      params.set('sortOrder', sorting[0].desc ? 'desc' : 'asc');
+    }
+
+    columnFilters.forEach((filter) => {
+      if (filter.value) {
+        params.set(filter.id, filter.value as string);
+      }
+    });
+
+    if (sourceFilter) {
+      params.set('source', sourceFilter);
+    }
+
+    const response = await fetch(`/api/connections?${params.toString()}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch connections');
+    }
+
+    return response.json();
+  };
+
+  const {
+    data: queryData,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+  } = useInfiniteQuery({
+    queryKey: ['connections', pageSize, sorting, columnFilters, sourceFilter],
+    queryFn: fetchConnectionsPage,
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => {
+      const { page, totalPages } = lastPage.pagination;
+      return page < totalPages ? page + 1 : undefined;
+    },
+  });
+
+  const allConnections = queryData?.pages.flatMap((p) => p.connections) ?? [];
+  const totalCount = queryData?.pages[0]?.pagination.totalCount ?? 0;
+  const availableSources = queryData?.pages[0]?.availableSources ?? [];
+
+  // Intersection Observer for infinite scroll
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { rootMargin: '100px' }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   // Column definitions
   const columns: ColumnDef<Connection>[] = [
@@ -300,12 +363,11 @@ export function ConnectionsGrid({ onFindPath }: ConnectionsGridProps) {
   ];
 
   const table = useReactTable({
-    data,
+    data: allConnections,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onGlobalFilterChange: setGlobalFilter,
@@ -315,56 +377,6 @@ export function ConnectionsGrid({ onFindPath }: ConnectionsGridProps) {
       globalFilter,
     },
   });
-
-  // Fetch data
-  const fetchConnections = async () => {
-    try {
-      setLoading(true);
-      const params = new URLSearchParams({
-        page: pagination.page.toString(),
-        pageSize: pagination.pageSize.toString(),
-      });
-
-      // Add sorting
-      if (sorting.length > 0) {
-        params.set('sortBy', sorting[0].id);
-        params.set('sortOrder', sorting[0].desc ? 'desc' : 'asc');
-      }
-
-      // Add column filters
-      columnFilters.forEach((filter) => {
-        if (filter.value) {
-          params.set(filter.id, filter.value as string);
-        }
-      });
-
-      // Add source filter
-      if (sourceFilter) {
-        params.set('source', sourceFilter);
-      }
-
-      const response = await fetch(`/api/connections?${params.toString()}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch connections');
-      }
-
-      const result: ConnectionsResponse = await response.json();
-      setData(result.connections);
-      setPagination(result.pagination);
-      if (result.availableSources) {
-        setAvailableSources(result.availableSources);
-      }
-    } catch (error) {
-      console.error('Error fetching connections:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchConnections();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pagination.page, pagination.pageSize, sorting, columnFilters, sourceFilter]);
 
   return (
     <div className="space-y-4">
@@ -389,8 +401,31 @@ export function ConnectionsGrid({ onFindPath }: ConnectionsGridProps) {
             </Button>
           )}
         </div>
-        <div className="text-sm text-muted-foreground">
-          {pagination.totalCount} total connections
+        <div className="flex items-center gap-3">
+          <div className="text-sm text-muted-foreground">
+            {totalCount} total connections
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                {pageSize} per page
+                <ChevronDown className="h-3 w-3 ml-1 opacity-50" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Page Size</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {PAGE_SIZE_OPTIONS.map((size) => (
+                <DropdownMenuItem
+                  key={size}
+                  onClick={() => setPageSize(size)}
+                  className={pageSize === size ? 'bg-accent' : ''}
+                >
+                  {size} per page
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -452,7 +487,7 @@ export function ConnectionsGrid({ onFindPath }: ConnectionsGridProps) {
       {/* Data Table */}
       <Card>
         <div className="relative">
-          {loading && (
+          {isLoading && (
             <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
               <div className="text-sm text-muted-foreground">Loading...</div>
             </div>
@@ -505,47 +540,29 @@ export function ConnectionsGrid({ onFindPath }: ConnectionsGridProps) {
           </Table>
         </div>
 
-        {/* Pagination */}
-        <div className="flex items-center justify-between px-4 py-4 border-t">
-          <div className="text-sm text-muted-foreground">
-            Showing {(pagination.page - 1) * pagination.pageSize + 1} to{' '}
-            {Math.min(
-              pagination.page * pagination.pageSize,
-              pagination.totalCount
-            )}{' '}
-            of {pagination.totalCount} results
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                setPagination((prev) => ({ ...prev, page: prev.page - 1 }))
-              }
-              disabled={pagination.page === 1}
-            >
-              <ChevronLeft className="h-4 w-4 mr-1" />
-              Previous
-            </Button>
-            <div className="flex items-center gap-1">
-              <span className="text-sm">
-                Page {pagination.page} of {pagination.totalPages}
-              </span>
+        {/* Footer */}
+        <div className="px-4 py-4 border-t space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-muted-foreground">
+              Showing {allConnections.length} of {totalCount} connections
+              {hasNextPage && ' (scroll for more)'}
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                setPagination((prev) => ({ ...prev, page: prev.page + 1 }))
-              }
-              disabled={pagination.page === pagination.totalPages}
-            >
-              Next
-              <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
           </div>
+          {totalCount > 0 && (
+            <Progress value={(allConnections.length / totalCount) * 100} className="h-1" />
+          )}
         </div>
       </Card>
+
+      {/* Scroll sentinel */}
+      <div ref={sentinelRef} className="flex items-center justify-center py-4">
+        {isFetchingNextPage && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading more...
+          </div>
+        )}
+      </div>
 
       {/* Person Detail Dialog */}
       <Dialog open={selectedPersonId !== null} onOpenChange={(open) => !open && setSelectedPersonId(null)}>
