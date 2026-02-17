@@ -5,7 +5,7 @@
  * Full-featured data grid for browsing connections with filtering and sorting
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import {
   useReactTable,
@@ -21,7 +21,6 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -84,7 +83,57 @@ interface ConnectionsGridProps {
   onFindPath?: (person: Person) => void;
 }
 
-const PAGE_SIZE_OPTIONS = [25, 50, 100, 200] as const;
+export const PAGE_SIZE_OPTIONS = [25, 50, 100, 200] as const;
+
+/** Build URL search params for the connections API */
+export function buildConnectionsParams(options: {
+  page: number;
+  pageSize: number;
+  sorting: SortingState;
+  columnFilters: ColumnFiltersState;
+  sourceFilter: string;
+}): URLSearchParams {
+  const params = new URLSearchParams({
+    page: options.page.toString(),
+    pageSize: options.pageSize.toString(),
+  });
+
+  if (options.sorting.length > 0) {
+    params.set('sortBy', options.sorting[0].id);
+    params.set('sortOrder', options.sorting[0].desc ? 'desc' : 'asc');
+  }
+
+  options.columnFilters.forEach((filter) => {
+    if (filter.value) {
+      params.set(filter.id, filter.value as string);
+    }
+  });
+
+  if (options.sourceFilter) {
+    params.set('source', options.sourceFilter);
+  }
+
+  return params;
+}
+
+/** Determine the next page param for infinite query pagination */
+export function getNextPageParam(lastPage: ConnectionsResponse): number | undefined {
+  const { page, totalPages } = lastPage.pagination;
+  return page < totalPages ? page + 1 : undefined;
+}
+
+/** Get footer text based on current loading/data state */
+export function getFooterText(options: {
+  isFetchingNextPage: boolean;
+  hasNextPage: boolean;
+  totalCount: number;
+  loadedCount: number;
+}): string {
+  if (options.isFetchingNextPage) return 'Loading more...';
+  if (!options.hasNextPage && options.totalCount > 0)
+    return `All ${options.totalCount} connections loaded`;
+  return `Showing ${options.loadedCount} of ${options.totalCount} connections`;
+}
 
 export function ConnectionsGrid({ onFindPath }: ConnectionsGridProps) {
   const [pageSize, setPageSize] = useState(50);
@@ -94,27 +143,21 @@ export function ConnectionsGrid({ onFindPath }: ConnectionsGridProps) {
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
   const [sourceFilter, setSourceFilter] = useState<string>('');
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const handlePageSizeChange = useCallback((size: number) => {
+    setPageSize(size);
+    scrollContainerRef.current?.scrollTo(0, 0);
+  }, []);
 
   const fetchConnectionsPage = async ({ pageParam = 1 }: { pageParam?: number }): Promise<ConnectionsResponse> => {
-    const params = new URLSearchParams({
-      page: pageParam.toString(),
-      pageSize: pageSize.toString(),
+    const params = buildConnectionsParams({
+      page: pageParam,
+      pageSize,
+      sorting,
+      columnFilters,
+      sourceFilter,
     });
-
-    if (sorting.length > 0) {
-      params.set('sortBy', sorting[0].id);
-      params.set('sortOrder', sorting[0].desc ? 'desc' : 'asc');
-    }
-
-    columnFilters.forEach((filter) => {
-      if (filter.value) {
-        params.set(filter.id, filter.value as string);
-      }
-    });
-
-    if (sourceFilter) {
-      params.set('source', sourceFilter);
-    }
 
     const response = await fetch(`/api/connections?${params.toString()}`);
     if (!response.ok) {
@@ -134,20 +177,18 @@ export function ConnectionsGrid({ onFindPath }: ConnectionsGridProps) {
     queryKey: ['connections', pageSize, sorting, columnFilters, sourceFilter],
     queryFn: fetchConnectionsPage,
     initialPageParam: 1,
-    getNextPageParam: (lastPage) => {
-      const { page, totalPages } = lastPage.pagination;
-      return page < totalPages ? page + 1 : undefined;
-    },
+    getNextPageParam,
   });
 
   const allConnections = queryData?.pages.flatMap((p) => p.connections) ?? [];
   const totalCount = queryData?.pages[0]?.pagination.totalCount ?? 0;
   const availableSources = queryData?.pages[0]?.availableSources ?? [];
 
-  // Intersection Observer for infinite scroll
+  // Intersection Observer for infinite scroll — uses scroll container as root
   useEffect(() => {
     const sentinel = sentinelRef.current;
-    if (!sentinel) return;
+    const scrollContainer = scrollContainerRef.current;
+    if (!sentinel || !scrollContainer) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -155,12 +196,12 @@ export function ConnectionsGrid({ onFindPath }: ConnectionsGridProps) {
           fetchNextPage();
         }
       },
-      { rootMargin: '100px' }
+      { root: scrollContainer, rootMargin: '200px' }
     );
 
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage, scrollContainerRef.current]);
 
   // Column definitions
   const columns: ColumnDef<Connection>[] = [
@@ -408,20 +449,20 @@ export function ConnectionsGrid({ onFindPath }: ConnectionsGridProps) {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm">
-                {pageSize} per page
+                {pageSize} per batch
                 <ChevronDown className="h-3 w-3 ml-1 opacity-50" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Page Size</DropdownMenuLabel>
+              <DropdownMenuLabel>Batch Size</DropdownMenuLabel>
               <DropdownMenuSeparator />
               {PAGE_SIZE_OPTIONS.map((size) => (
                 <DropdownMenuItem
                   key={size}
-                  onClick={() => setPageSize(size)}
+                  onClick={() => handlePageSizeChange(size)}
                   className={pageSize === size ? 'bg-accent' : ''}
                 >
-                  {size} per page
+                  {size} per batch
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
@@ -485,15 +526,19 @@ export function ConnectionsGrid({ onFindPath }: ConnectionsGridProps) {
       </div>
 
       {/* Data Table */}
-      <Card>
-        <div className="relative">
+      <Card className="flex flex-col">
+        <div
+          ref={scrollContainerRef}
+          className="relative overflow-auto min-h-[300px]"
+          style={{ maxHeight: 'calc(100vh - 320px)' }}
+        >
           {isLoading && (
             <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
               <div className="text-sm text-muted-foreground">Loading...</div>
             </div>
           )}
-          <Table>
-            <TableHeader>
+          <table className="w-full caption-bottom text-sm">
+            <TableHeader className="sticky top-0 z-10 bg-background">
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id}>
                   {headerGroup.headers.map((header) => (
@@ -537,15 +582,29 @@ export function ConnectionsGrid({ onFindPath }: ConnectionsGridProps) {
                 </TableRow>
               )}
             </TableBody>
-          </Table>
+          </table>
+
+          {/* Scroll sentinel — inside scroll container */}
+          <div ref={sentinelRef} className="flex items-center justify-center py-4">
+            {isFetchingNextPage && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading more...
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Footer */}
         <div className="px-4 py-4 border-t space-y-2">
           <div className="flex items-center justify-between">
             <div className="text-sm text-muted-foreground">
-              Showing {allConnections.length} of {totalCount} connections
-              {hasNextPage && ' (scroll for more)'}
+              {getFooterText({
+                isFetchingNextPage,
+                hasNextPage: hasNextPage ?? false,
+                totalCount,
+                loadedCount: allConnections.length,
+              })}
             </div>
           </div>
           {totalCount > 0 && (
@@ -553,16 +612,6 @@ export function ConnectionsGrid({ onFindPath }: ConnectionsGridProps) {
           )}
         </div>
       </Card>
-
-      {/* Scroll sentinel */}
-      <div ref={sentinelRef} className="flex items-center justify-center py-4">
-        {isFetchingNextPage && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Loading more...
-          </div>
-        )}
-      </div>
 
       {/* Person Detail Dialog */}
       <Dialog open={selectedPersonId !== null} onOpenChange={(open) => !open && setSelectedPersonId(null)}>

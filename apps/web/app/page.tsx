@@ -131,6 +131,14 @@ export default function IntroFinderPage() {
   const [sources, setSources] = useState<DataSource[]>(DATA_SOURCES);
   const [linkedInDialogOpen, setLinkedInDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('finder');
+  const [connectionsActivated, setConnectionsActivated] = useState(false);
+
+  // Activate connections tab on first visit (keeps it mounted afterward)
+  useEffect(() => {
+    if (activeTab === 'connections') {
+      setConnectionsActivated(true);
+    }
+  }, [activeTab]);
 
   // Fetch current user's person record and connection status
   const { data: meData } = useQuery<{
@@ -542,7 +550,11 @@ export default function IntroFinderPage() {
           {introFinderContent}
         </TabsContent>
 
-        <TabsContent value="connections" className="mt-0">
+        <TabsContent
+          value="connections"
+          className="mt-0 data-[state=inactive]:hidden"
+          forceMount={connectionsActivated ? true : undefined}
+        >
           <div className="space-y-4">
             <div>
               <h2 className="text-2xl font-bold mb-2">Connections</h2>
@@ -551,7 +563,7 @@ export default function IntroFinderPage() {
               </p>
             </div>
             <NetworkStatsBar />
-            <ConnectionsGrid onFindPath={handleFindPath} />
+            {connectionsActivated && <ConnectionsGrid onFindPath={handleFindPath} />}
           </div>
         </TabsContent>
 
