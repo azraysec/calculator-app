@@ -193,7 +193,12 @@ export function ConnectionsGrid({ onFindPath }: ConnectionsGridProps) {
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
-          fetchNextPage();
+          // Only auto-fetch when content actually overflows the container.
+          // Prevents tight fetch loop when client-side filters shrink visible
+          // rows and the sentinel becomes visible without user scrolling.
+          if (scrollContainer.scrollHeight > scrollContainer.clientHeight) {
+            fetchNextPage();
+          }
         }
       },
       { root: scrollContainer, rootMargin: '200px' }
