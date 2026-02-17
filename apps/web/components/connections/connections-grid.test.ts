@@ -25,7 +25,7 @@ describe('buildConnectionsParams', () => {
       page: 1,
       pageSize: 50,
       sorting: [],
-      columnFilters: [],
+
       sourceFilter: '',
     });
 
@@ -38,7 +38,7 @@ describe('buildConnectionsParams', () => {
       page: 5,
       pageSize: 100,
       sorting: [],
-      columnFilters: [],
+
       sourceFilter: '',
     });
 
@@ -51,7 +51,7 @@ describe('buildConnectionsParams', () => {
       page: 1,
       pageSize: 50,
       sorting: [{ id: 'names', desc: false }],
-      columnFilters: [],
+
       sourceFilter: '',
     });
 
@@ -64,7 +64,7 @@ describe('buildConnectionsParams', () => {
       page: 1,
       pageSize: 50,
       sorting: [{ id: 'connectionCount', desc: true }],
-      columnFilters: [],
+
       sourceFilter: '',
     });
 
@@ -80,7 +80,7 @@ describe('buildConnectionsParams', () => {
         { id: 'names', desc: false },
         { id: 'company', desc: true },
       ],
-      columnFilters: [],
+
       sourceFilter: '',
     });
 
@@ -93,7 +93,7 @@ describe('buildConnectionsParams', () => {
       page: 1,
       pageSize: 50,
       sorting: [],
-      columnFilters: [],
+
       sourceFilter: '',
     });
 
@@ -101,32 +101,13 @@ describe('buildConnectionsParams', () => {
     expect(params.has('sortOrder')).toBe(false);
   });
 
-  it('should add column filters with non-empty values', () => {
+  it('should not send column filters to server (client-side only)', () => {
+    // Column filters are handled by TanStack Table client-side.
+    // They must NOT appear in the URL params.
     const params = buildConnectionsParams({
       page: 1,
       pageSize: 50,
       sorting: [],
-      columnFilters: [
-        { id: 'names', value: 'john' },
-        { id: 'company', value: 'acme' },
-      ],
-      sourceFilter: '',
-    });
-
-    expect(params.get('names')).toBe('john');
-    expect(params.get('company')).toBe('acme');
-  });
-
-  it('should skip column filters with empty/falsy values', () => {
-    const params = buildConnectionsParams({
-      page: 1,
-      pageSize: 50,
-      sorting: [],
-      columnFilters: [
-        { id: 'names', value: '' },
-        { id: 'company', value: null },
-        { id: 'title', value: undefined },
-      ],
       sourceFilter: '',
     });
 
@@ -140,7 +121,7 @@ describe('buildConnectionsParams', () => {
       page: 1,
       pageSize: 50,
       sorting: [],
-      columnFilters: [],
+
       sourceFilter: 'linkedin',
     });
 
@@ -152,7 +133,7 @@ describe('buildConnectionsParams', () => {
       page: 1,
       pageSize: 50,
       sorting: [],
-      columnFilters: [],
+
       sourceFilter: '',
     });
 
@@ -164,7 +145,6 @@ describe('buildConnectionsParams', () => {
       page: 3,
       pageSize: 100,
       sorting: [{ id: 'connectionCount', desc: true }],
-      columnFilters: [{ id: 'company', value: 'google' }],
       sourceFilter: 'gmail',
     });
 
@@ -172,8 +152,10 @@ describe('buildConnectionsParams', () => {
     expect(params.get('pageSize')).toBe('100');
     expect(params.get('sortBy')).toBe('connectionCount');
     expect(params.get('sortOrder')).toBe('desc');
-    expect(params.get('company')).toBe('google');
     expect(params.get('source')).toBe('gmail');
+    // Column filters must NOT be in server params
+    expect(params.has('names')).toBe(false);
+    expect(params.has('company')).toBe(false);
   });
 
   it('should produce a valid URL query string', () => {
@@ -181,7 +163,7 @@ describe('buildConnectionsParams', () => {
       page: 1,
       pageSize: 25,
       sorting: [],
-      columnFilters: [],
+
       sourceFilter: '',
     });
 

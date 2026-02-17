@@ -85,12 +85,13 @@ interface ConnectionsGridProps {
 
 export const PAGE_SIZE_OPTIONS = [25, 50, 100, 200] as const;
 
-/** Build URL search params for the connections API */
+/** Build URL search params for the connections API.
+ *  Column filters (name, email, title, company) are handled client-side
+ *  by TanStack Table's getFilteredRowModel — they are NOT sent to the server. */
 export function buildConnectionsParams(options: {
   page: number;
   pageSize: number;
   sorting: SortingState;
-  columnFilters: ColumnFiltersState;
   sourceFilter: string;
 }): URLSearchParams {
   const params = new URLSearchParams({
@@ -102,12 +103,6 @@ export function buildConnectionsParams(options: {
     params.set('sortBy', options.sorting[0].id);
     params.set('sortOrder', options.sorting[0].desc ? 'desc' : 'asc');
   }
-
-  options.columnFilters.forEach((filter) => {
-    if (filter.value) {
-      params.set(filter.id, filter.value as string);
-    }
-  });
 
   if (options.sourceFilter) {
     params.set('source', options.sourceFilter);
@@ -155,7 +150,6 @@ export function ConnectionsGrid({ onFindPath }: ConnectionsGridProps) {
       page: pageParam,
       pageSize,
       sorting,
-      columnFilters,
       sourceFilter,
     });
 
@@ -174,7 +168,7 @@ export function ConnectionsGrid({ onFindPath }: ConnectionsGridProps) {
     isFetchingNextPage,
     isLoading,
   } = useInfiniteQuery({
-    queryKey: ['connections', pageSize, sorting, columnFilters, sourceFilter],
+    queryKey: ['connections', pageSize, sorting, sourceFilter],
     queryFn: fetchConnectionsPage,
     initialPageParam: 1,
     getNextPageParam,
