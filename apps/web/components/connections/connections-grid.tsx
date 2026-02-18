@@ -5,7 +5,7 @@
  * Full-featured data grid for browsing connections with filtering and sorting
  */
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import {
   useReactTable,
@@ -137,11 +137,12 @@ export function ConnectionsGrid({ onFindPath }: ConnectionsGridProps) {
   const [globalFilter, setGlobalFilter] = useState('');
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
   const [sourceFilter, setSourceFilter] = useState<string>('');
-  const sentinelRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const autoFillAttempted = useRef(false);
 
   const handlePageSizeChange = useCallback((size: number) => {
     setPageSize(size);
+    autoFillAttempted.current = false;
     scrollContainerRef.current?.scrollTo(0, 0);
   }, []);
 
@@ -174,33 +175,50 @@ export function ConnectionsGrid({ onFindPath }: ConnectionsGridProps) {
     getNextPageParam,
   });
 
-  const allConnections = queryData?.pages.flatMap((p) => p.connections) ?? [];
+  const allConnections = useMemo(
+    () => queryData?.pages.flatMap((p) => p.connections) ?? [],
+    [queryData]
+  );
   const totalCount = queryData?.pages[0]?.pagination.totalCount ?? 0;
   const availableSources = queryData?.pages[0]?.availableSources ?? [];
 
-  // Intersection Observer for infinite scroll — uses scroll container as root
+  // Scroll-based infinite loading — only fires when the user actually scrolls.
+  // Replaces IntersectionObserver which caused a rapid fetch cascade on mount
+  // (observer recreation on every state change fired initial callbacks repeatedly).
   useEffect(() => {
-    const sentinel = sentinelRef.current;
-    const scrollContainer = scrollContainerRef.current;
-    if (!sentinel || !scrollContainer) return;
+    const container = scrollContainerRef.current;
+    if (!container) return;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
-          // Only auto-fetch when content actually overflows the container.
-          // Prevents tight fetch loop when client-side filters shrink visible
-          // rows and the sentinel becomes visible without user scrolling.
-          if (scrollContainer.scrollHeight > scrollContainer.clientHeight) {
-            fetchNextPage();
-          }
-        }
-      },
-      { root: scrollContainer, rootMargin: '200px' }
-    );
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      if (
+        scrollHeight - scrollTop - clientHeight < 200 &&
+        hasNextPage &&
+        !isFetchingNextPage
+      ) {
+        fetchNextPage();
+      }
+    };
 
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage, scrollContainerRef.current]);
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  // Auto-fill: if content doesn't overflow the container after data loads,
+  // fetch one more page so the user has a scrollbar to scroll for more.
+  useEffect(() => {
+    if (isLoading || isFetchingNextPage || !hasNextPage || autoFillAttempted.current) return;
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    // Wait for DOM to settle after render
+    requestAnimationFrame(() => {
+      if (container.scrollHeight <= container.clientHeight) {
+        autoFillAttempted.current = true;
+        fetchNextPage();
+      }
+    });
+  }, [isLoading, isFetchingNextPage, hasNextPage, fetchNextPage, allConnections.length]);
 
   // Column definitions
   const columns: ColumnDef<Connection>[] = [
@@ -583,8 +601,8 @@ export function ConnectionsGrid({ onFindPath }: ConnectionsGridProps) {
             </TableBody>
           </table>
 
-          {/* Scroll sentinel — inside scroll container */}
-          <div ref={sentinelRef} className="flex items-center justify-center py-4">
+          {/* Loading indicator at bottom of scroll area */}
+          <div className="flex items-center justify-center py-4">
             {isFetchingNextPage && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
